@@ -34,7 +34,7 @@ import { NotificationDropdown } from "@/components/ui/notification";
 import { useCompanyNotifications } from "@/lib/useCompanyNotifications";
 import { contactService, type Contact } from "@/lib/contact-service";
 import { adminService, type AdminCompany } from "@/lib/admin-service";
-import wasteCompanyService from "@/lib/waste-company-service";
+import { wasteCompanyService } from "@/lib/api-services";
 import { toast } from "react-toastify";
 
 ChartJS.register(
@@ -191,16 +191,15 @@ export default function SupperDashboard() {
       if (viewMode === 'pending') {
         response = await adminService.getPendingCompanies(page, pageSize);
       } else {
-        // For 'all', we might not have a paginated endpoint in wasteCompanyService yet
-        // but let's assume it returns a list for now or adapt if needed
-        const data = await wasteCompanyService.getAllCompanies();
+        // For 'all', we use the mock service from api-services
+        const data = await wasteCompanyService.getPendingCompanies();
         response = {
           content: data.map((c: any) => ({
             ...c,
             id: c.id?.toString(),
-            name: c.companyName,
-            phone: c.phoneNumber,
-            createdAt: c.createdAt // Ensure createdAt exists for the date formatter
+            name: c.name,
+            phone: c.phone,
+            createdAt: c.createdAt || new Date().toISOString()
           })) as AdminCompany[],
           totalPages: 1,
           totalElements: data.length,
@@ -367,29 +366,29 @@ export default function SupperDashboard() {
       }
 
       return (
-        <div className="mt-6">
-          <h2 className="text-2xl font-bold mb-6">Contact Submissions</h2>
+        <div className="mt-4 lg:mt-6">
+          <h2 className="text-xl lg:text-2xl font-bold mb-4 lg:mb-6">Contact Submissions</h2>
 
-          <div className="grid gap-4">
+          <div className="grid gap-3 lg:gap-4">
             {contacts.length === 0 ? (
-              <Card className="p-12 rounded-2xl shadow text-center">
-                <MessageSquare className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No contact submissions found</p>
+              <Card className="p-8 lg:p-12 rounded-2xl shadow text-center">
+                <MessageSquare className="w-10 h-10 lg:w-12 lg:h-12 text-gray-400 mx-auto mb-3 lg:mb-4" />
+                <p className="text-gray-600 text-sm lg:text-base">No contact submissions found</p>
               </Card>
             ) : (
               contacts.map((contact) => (
-                <Card key={contact.id} className="p-6 rounded-2xl shadow hover:shadow-lg transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
+                <Card key={contact.id} className="p-4 lg:p-6 rounded-2xl shadow hover:shadow-lg transition-shadow">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 lg:gap-4 mb-3 lg:mb-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <User className="w-5 h-5 text-green-600" />
+                      <div className="w-8 h-8 lg:w-10 lg:h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 lg:w-5 lg:h-5 text-green-600" />
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-lg">{contact.fullName}</h3>
-                        <p className="text-gray-500 text-sm">{contact.email}</p>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-base lg:text-lg truncate">{contact.fullName}</h3>
+                        <p className="text-gray-500 text-xs lg:text-sm truncate">{contact.email}</p>
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${contact.processed
+                    <span className={`px-2 lg:px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 ${contact.processed
                       ? 'bg-green-100 text-green-800'
                       : 'bg-yellow-100 text-yellow-800'
                       }`}>
@@ -397,50 +396,52 @@ export default function SupperDashboard() {
                     </span>
                   </div>
 
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-2 text-sm">
+                  <div className="space-y-2 mb-3 lg:mb-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs lg:text-sm">
                       <span className="font-medium text-gray-700">Service Interest:</span>
                       <span className="text-gray-600 capitalize">{contact.serviceInterest}</span>
                     </div>
                     {contact.phone && (
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs lg:text-sm">
                         <span className="font-medium text-gray-700">Phone:</span>
                         <span className="text-gray-600">{contact.phone}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                    <p className="text-gray-700 text-sm leading-relaxed italic">
+                  <div className="mb-3 lg:mb-4 p-3 lg:p-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-700 text-xs lg:text-sm leading-relaxed italic line-clamp-3">
                       &quot;{contact.message}&quot;
                     </p>
                   </div>
 
-                  <div className="flex justify-between items-center pt-4 border-t">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                      <Calendar className="w-4 h-4" />
-                      {new Date(contact.createdAt).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pt-3 lg:pt-4 border-t">
+                    <div className="flex items-center gap-2 text-xs lg:text-sm text-gray-500">
+                      <Calendar className="w-3 h-3 lg:w-4 lg:h-4" />
+                      <span className="truncate">
+                        {new Date(contact.createdAt).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleViewContact(contact.id)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-1.5 lg:p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="View Details"
                       >
-                        <Eye size={18} />
+                        <Eye size={16} className="lg:w-[18px] lg:h-[18px]" />
                       </button>
                       <button
                         onClick={() => handleDeleteContact(contact.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-1.5 lg:p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete Contact"
                       >
-                        <X size={18} />
+                        <X size={16} className="lg:w-[18px] lg:h-[18px]" />
                       </button>
-                      <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                      <button className="px-3 lg:px-4 py-1.5 lg:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-xs lg:text-sm font-medium">
                         Reply
                       </button>
                     </div>
@@ -561,14 +562,15 @@ export default function SupperDashboard() {
       }
 
       return (
-        <div className="mt-6">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center gap-4">
-              <h2 className="text-2xl font-bold">Companies Registration</h2>
-              <div className="flex bg-gray-100 p-1 rounded-xl">
+        <div className="mt-4 lg:mt-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 lg:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 lg:gap-4">
+              <h2 className="text-xl lg:text-2xl font-bold">Companies Registration</h2>
+              <div className="flex bg-gray-100 p-1 rounded-xl w-fit">
                 <button
                   onClick={() => setViewMode('pending')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'pending'
+                  className={`px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all ${viewMode === 'pending'
                     ? 'bg-white text-green-700 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                     }`}
@@ -577,7 +579,7 @@ export default function SupperDashboard() {
                 </button>
                 <button
                   onClick={() => setViewMode('all')}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'all'
+                  className={`px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-medium transition-all ${viewMode === 'all'
                     ? 'bg-white text-green-700 shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
                     }`}
@@ -588,7 +590,7 @@ export default function SupperDashboard() {
             </div>
             <button
               onClick={() => fetchCompanies()}
-              className="text-sm text-green-600 hover:text-green-700 font-medium"
+              className="text-xs lg:text-sm text-green-600 hover:text-green-700 font-medium self-start sm:self-auto"
             >
               Refresh
             </button>
@@ -731,26 +733,29 @@ export default function SupperDashboard() {
 
     // Overview section
     return (
-      <div className="mt-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mt-4 lg:mt-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
           <StatCard title="Total Households" value="2,847" note="+12% this month" color="text-green-600" />
           <StatCard title="Registered Companies" value="156/160" note="98%" color="text-green-600" />
           <StatCard title="Active Routes" value="24" />
         </div>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-6">
-          <Card className="p-4 rounded-2xl shadow h-[420px]">
-            <h2 className="font-semibold mb-4">District Complaints Overview</h2>
-            <div className="h-[330px]">
+        
+        {/* Charts */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6 mt-4 lg:mt-6">
+          <Card className="p-3 lg:p-4 rounded-2xl shadow">
+            <h2 className="font-semibold mb-3 lg:mb-4 text-sm lg:text-base">District Complaints Overview</h2>
+            <div className="h-[280px] lg:h-[330px]">
               <Bar data={barData} options={barOptions} />
             </div>
           </Card>
-          <Card className="p-4 rounded-2xl shadow h-[420px]">
-            <h2 className="font-semibold mb-4">Monthly Revenue Distribution</h2>
-            <div className="relative h-[260px] flex items-center justify-center">
+          <Card className="p-3 lg:p-4 rounded-2xl shadow">
+            <h2 className="font-semibold mb-3 lg:mb-4 text-sm lg:text-base">Monthly Revenue Distribution</h2>
+            <div className="relative h-[220px] lg:h-[260px] flex items-center justify-center">
               <Doughnut data={donutData} options={donutOptions} />
               <div className="absolute text-center">
-                <p className="text-xl font-bold">85K</p>
-                <p className="text-sm text-gray-500">RWF</p>
+                <p className="text-lg lg:text-xl font-bold">85K</p>
+                <p className="text-xs lg:text-sm text-gray-500">RWF</p>
               </div>
             </div>
           </Card>
