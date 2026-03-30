@@ -51,7 +51,7 @@ export default function Signup() {
     alert(`Signup successful as ${formData.role}! (Frontend-only simulation)`);
 
     // Simulate redirect
-    router.push("/login");
+    router.push("/signin");
   };
 
   return (
@@ -152,7 +152,7 @@ export default function Signup() {
 
         <p className="text-center mt-4 text-gray-600">
           Already have an account?{" "}
-          <a href="/login" className="text-green-500 hover:underline">
+          <a href="/signin" className="text-green-500 hover:underline">
             Log in
           </a>
         </p>
