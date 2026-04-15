@@ -16,7 +16,8 @@ import {
   BarChart3,
   Play,
   Pause,
-  Square
+  Square,
+  LogOut
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -158,6 +159,12 @@ export default function DriverDashboard() {
     ? (currentSession.completed / currentSession.households) * 100
     : (driverStats.completedHouseholds / driverStats.totalHouseholds) * 100;
 
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_info');
+    router.push('/signin');
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -173,6 +180,10 @@ export default function DriverDashboard() {
           <Button onClick={() => router.push('/driver/sessions/new')}>
             <Truck size={20} className="mr-2" />
             New Session
+          </Button>
+          <Button variant="outline" className="text-red-600 border-red-300 hover:bg-red-50 hover:border-red-400" onClick={handleLogout}>
+            <LogOut size={20} className="mr-2" />
+            Logout
           </Button>
         </div>
       </div>
