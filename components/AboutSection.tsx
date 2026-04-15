@@ -32,7 +32,7 @@ const AnimatedCounter = ({ value, duration = 2 }: { value: number; duration?: nu
 
 const AboutSection: React.FC = () => {
   const logos = [
-    "Rema.png",
+    "/Rema.png",
     "/RSB.png",
     "/moe_logo.svg",
     "/RGF-Approved-logo-01.png",

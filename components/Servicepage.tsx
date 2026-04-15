@@ -21,7 +21,7 @@ const services = [
     title: "Instant Reporting & Resolution for Missed Pickups",
     description:
       "A direct portal for citizens to instantly report a missed collection or request a one-off extra pickup for special waste.",
-    image: "/Service3.png",
+    image: "/service3.png",
   },
 ];
 
