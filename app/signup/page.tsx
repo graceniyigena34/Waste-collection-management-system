@@ -56,7 +56,20 @@ export default function Signup() {
     await new Promise((r) => setTimeout(r, 800));
     setLoading(false);
 
-    router.push("/signin");
+    // Store basic user info so household-details page knows who is registering
+    const roleMap: Record<string, string> = { citizen: "CITIZEN", collector: "DRIVER", admin: "ADMIN" };
+    const userInfo = { fullName, email, role: roleMap[formData.role] };
+    localStorage.setItem("auth_token", "mock_token_123");
+    localStorage.setItem("user_info", JSON.stringify(userInfo));
+
+    // Citizens must fill household details first; others go straight to signin
+    if (formData.role === "citizen") {
+      // Always send citizen to household-details after signup so they fill the form
+      localStorage.removeItem("household_details_submitted");
+      router.push("/household-details");
+    } else {
+      router.push("/signin");
+    }
   };
 
   const inputClass =
