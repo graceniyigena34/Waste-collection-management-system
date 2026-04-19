@@ -20,7 +20,7 @@ const AnimatedCounter = ({ value, duration = 2 }: { value: number; duration?: nu
   }, [motionValue, isInView, value]);
 
   useEffect(() => {
-    return displayed.onChange(setDisplayValue);
+    return displayed.on("change", setDisplayValue);
   }, [displayed]);
 
   return (

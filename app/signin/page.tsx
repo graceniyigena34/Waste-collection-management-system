@@ -70,6 +70,7 @@ export default function Signin() {
           src="/landingImage.png"
           alt="GreenEx"
           fill
+          sizes="50vw"
           className="object-cover"
           priority
         />

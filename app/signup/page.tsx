@@ -2,7 +2,7 @@
 
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Truck, Eye, EyeOff, Mail, Lock, User, Phone, ChevronDown } from "lucide-react";
+import { Truck, Eye, EyeOff, Mail, Lock, User, ChevronDown } from "lucide-react";
 import Image from "next/image";
 
 interface SignupForm {
@@ -83,6 +83,7 @@ export default function Signup() {
           src="/landingImage.png"
           alt="GreenEx"
           fill
+          sizes="50vw"
           className="object-cover"
           priority
         />
@@ -162,15 +163,21 @@ export default function Signup() {
             {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Telephone Number</label>
-              <div className="relative">
-                <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <div className="flex">
+                {/* Country code prefix */}
+                <div className="flex items-center gap-1.5 px-3 py-3 bg-gray-50 border border-gray-300 border-r-0 rounded-l-xl text-sm text-gray-700 font-medium whitespace-nowrap select-none">
+                  <span className="text-lg leading-none">🇷🇼</span>
+                  <span>+250</span>
+                </div>
+                {/* Number input */}
                 <input
                   type="tel"
                   name="telephoneNumber"
                   value={formData.telephoneNumber}
                   onChange={handleChange}
-                  className={`${inputClass} pl-10 pr-4`}
-                  placeholder="+250 7XX XXX XXX"
+                  className="flex-1 py-3 px-4 border border-gray-300 rounded-r-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                  placeholder="7XX XXX XXX"
+                  maxLength={9}
                   required
                 />
               </div>

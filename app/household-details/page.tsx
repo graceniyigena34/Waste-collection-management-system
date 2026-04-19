@@ -360,7 +360,7 @@ export default function HouseholdDetailsPage() {
       {/* ── Right: sticky summary + hero ── */}
       <div className="hidden lg:flex lg:w-1/2 flex-col sticky top-0 h-screen overflow-hidden">
         <div className="relative flex-1">
-          <Image src="/landingImage.png" alt="GreenEx" fill className="object-cover" priority />
+          <Image src="/landingImage.png" alt="GreenEx" fill sizes="50vw" className="object-cover" priority />
           <div className="absolute inset-0 bg-gradient-to-b from-green-900/80 via-green-800/60 to-green-900/90" />
 
           <div className="relative z-10 flex flex-col h-full px-12 py-10 text-white">
