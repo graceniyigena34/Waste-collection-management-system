@@ -54,7 +54,12 @@ export default function Signin() {
     setLoading(false);
     if (formData.role === "admin") router.push("/admin");
     else if (formData.role === "collector") router.push("/driver");
-    else router.push("/User-Dashboard");
+    else {
+      // Citizen: check if household details already submitted
+      const submitted = localStorage.getItem("household_details_submitted");
+      if (submitted === "true") router.push("/User-Dashboard");
+      else router.push("/household-details");
+    }
   };
 
   return (
@@ -65,6 +70,7 @@ export default function Signin() {
           src="/landingImage.png"
           alt="GreenEx"
           fill
+          sizes="50vw"
           className="object-cover"
           priority
         />
