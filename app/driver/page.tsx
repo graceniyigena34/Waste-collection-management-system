@@ -253,7 +253,7 @@ export default function DriverDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Today's Sessions</p>
+                <p className="text-sm text-gray-600">Today&apos;s Sessions</p>
                 <p className="text-2xl font-bold text-blue-600">{driverStats.todaySessions}</p>
               </div>
               <Calendar className="text-blue-600" size={24} />
@@ -289,7 +289,7 @@ export default function DriverDashboard() {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Today's Earnings</p>
+                <p className="text-sm text-gray-600">Today&apos;s Earnings</p>
                 <p className="text-2xl font-bold text-orange-600">${driverStats.earnings.toFixed(2)}</p>
               </div>
               <DollarSign className="text-orange-600" size={24} />
@@ -303,7 +303,7 @@ export default function DriverDashboard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="text-blue-600" size={20} />
-            Today's Schedule
+            Today&apos;s Schedule
           </CardTitle>
         </CardHeader>
         <CardContent>

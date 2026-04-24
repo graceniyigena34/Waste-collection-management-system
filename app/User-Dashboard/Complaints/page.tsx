@@ -183,7 +183,7 @@ export default function ComplaintsSection() {
                   </label>
                   <select
                     value={formData.priority}
-                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as any }))}
+                    onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value as Complaint['priority'] }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   >
                     <option value="Low">Low</option>
@@ -241,7 +241,7 @@ export default function ComplaintsSection() {
             <div className="text-center py-8 text-gray-500">
               <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
               <p>No complaints submitted yet</p>
-              <p className="text-sm">Click "New Complaint" to submit your first complaint</p>
+              <p className="text-sm">Click &quot;New Complaint&quot; to submit your first complaint</p>
             </div>
           ) : (
             <div className="space-y-4">
