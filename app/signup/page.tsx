@@ -2,6 +2,7 @@
 
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Truck, Eye, EyeOff, Mail, Lock, User, ChevronDown } from "lucide-react";
 import Image from "next/image";
 
@@ -267,19 +268,19 @@ export default function Signup() {
 
           <p className="text-center mt-5 text-gray-500 text-sm">
             Already have an account?{" "}
-            <a href="/signin" className="text-green-700 hover:underline font-semibold">
+            <Link href="/signin" className="text-green-700 hover:underline font-semibold">
               Sign in
-            </a>
+            </Link>
           </p>
 
           <p className="text-center mt-3 text-gray-400 text-xs">
-            <a href="/" className="hover:text-green-700 transition">← Back to homepage</a>
+            <Link href="/" className="hover:text-green-700 transition">← Back to homepage</Link>
           </p>
 
           <p className="text-center mt-4 text-gray-400 text-xs">
             By creating an account you agree to our{" "}
-            <a href="/terms" className="hover:text-green-700 underline">Terms</a> and{" "}
-            <a href="/privacy" className="hover:text-green-700 underline">Privacy Policy</a>.
+            <Link href="/terms" className="hover:text-green-700 underline">Terms</Link> and{" "}
+            <Link href="/privacy" className="hover:text-green-700 underline">Privacy Policy</Link>.
           </p>
         </div>
       </div>

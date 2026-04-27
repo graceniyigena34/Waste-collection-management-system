@@ -22,7 +22,7 @@ export default function NotFound() {
           </h1>
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg border border-green-100">
             <p className="text-sm text-gray-600">
-              You can return to the homepage or use the navigation to find what you're looking for.
+              You can return to the homepage or use the navigation to find what you&apos;re looking for.
             </p>
           </div>
         </div>

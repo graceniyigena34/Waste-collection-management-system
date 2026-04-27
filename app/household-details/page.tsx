@@ -12,10 +12,22 @@ import {
   getVillagesByCell,
 } from "@/data/rwanda-admin";
 
+function getStoredUserFirstName() {
+  if (typeof window === "undefined") return "there";
+  const raw = localStorage.getItem("user_info");
+  if (!raw) return "there";
+  try {
+    const user = JSON.parse(raw) as { fullName?: string };
+    return user.fullName ? user.fullName.split(" ")[0] : "there";
+  } catch {
+    return "there";
+  }
+}
+
 export default function HouseholdDetailsPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [userName, setUserName] = useState("there");
+  const userName = getStoredUserFirstName();
   const [submitted, setSubmitted] = useState(false);
 
   /* ── location fields ── */
@@ -48,8 +60,6 @@ export default function HouseholdDetailsPage() {
     try {
       const user = JSON.parse(raw);
       if (user.role !== "CITIZEN") { router.push("/"); return; }
-      // Do NOT redirect if already submitted — let them re-fill if they land here
-      if (user.fullName) setUserName(user.fullName.split(" ")[0]);
     } catch {
       router.push("/signin");
     }

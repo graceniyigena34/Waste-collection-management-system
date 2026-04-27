@@ -18,11 +18,12 @@ const paymentSchema = z.object({
 });
 
 type PaymentFormData = z.infer<typeof paymentSchema>;
+type PaymentFormSubmission = PaymentFormData & { paid_at?: string };
 
 interface PaymentFormProps {
   payment?: Payment;
   households: Household[];
-  onSubmit: (data: any) => void;
+  onSubmit: (data: PaymentFormSubmission) => void;
   onCancel: () => void;
   isEditing?: boolean;
 }

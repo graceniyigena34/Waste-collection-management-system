@@ -62,7 +62,7 @@ export default function TermsPage() {
                         </h2>
                         <div className="space-y-3 sm:space-y-4 text-gray-700 dark:text-gray-300 leading-relaxed text-sm sm:text-base">
                             <p>
-                                <strong className="text-gray-900 dark:text-white">"User Content"</strong> means content that users have created and posted to the Platform for use by other Users, including both your devices and any comments that you or other Users may post to online comics or other User Content.
+                                <strong className="text-gray-900 dark:text-white">&quot;User Content&quot;</strong> means content that users have created and posted to the Platform for use by other Users, including both your devices and any comments that you or other Users may post to online comics or other User Content.
                             </p>
                             <p>
                                 You represent and warrant that you own the User Content you post to the Platform or that you have the legal right to post the User Content. You are solely responsible for your User Content. You agree that GreenEx will not be held liable to you with respect to the actions of any other user.

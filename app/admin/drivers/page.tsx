@@ -17,6 +17,30 @@ interface Driver {
   rating: number;
 }
 
+type DriverForm = Omit<Driver, 'id'>;
+
+interface DriverFieldProps {
+  label: string;
+  k: keyof DriverForm;
+  type?: string;
+  form: DriverForm;
+  setForm: React.Dispatch<React.SetStateAction<DriverForm>>;
+}
+
+function DriverField({ label, k, type = 'text', form, setForm }: DriverFieldProps) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+      <input
+        type={type}
+        value={String(form[k])}
+        onChange={e => setForm(f => ({ ...f, [k]: type === 'number' ? Number(e.target.value) : e.target.value }))}
+        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+      />
+    </div>
+  );
+}
+
 const initialDrivers: Driver[] = [
   { id: 'DRV-001', name: 'Nkurunziza Pierre', email: 'pierre@greenex.rw', phone: '+250 788 101 001', licenseNo: 'RW-2021-001', zone: 'Kicukiro', status: 'Active', truckId: 'TRK-01', joinDate: '2023-01-15', completedRoutes: 245, rating: 4.8 },
   { id: 'DRV-002', name: 'Uwase Claudine', email: 'claudine@greenex.rw', phone: '+250 788 102 002', licenseNo: 'RW-2021-002', zone: 'Gasabo', status: 'Active', truckId: 'TRK-02', joinDate: '2023-03-20', completedRoutes: 198, rating: 4.6 },
@@ -34,7 +58,7 @@ export default function DriversPage() {
   const [filterStatus, setFilterStatus] = useState('All');
   const [modal, setModal] = useState<'add' | 'edit' | 'view' | null>(null);
   const [selected, setSelected] = useState<Driver | null>(null);
-  const [form, setForm] = useState<Omit<Driver, 'id'>>(emptyForm);
+  const [form, setForm] = useState<DriverForm>(emptyForm);
 
   const filtered = drivers.filter(d =>
     (filterStatus === 'All' || d.status === filterStatus) &&
@@ -59,13 +83,6 @@ export default function DriversPage() {
     { label: 'Off Duty', value: drivers.filter(d => d.status === 'Off Duty').length, icon: <Clock size={18} className="text-yellow-600" />, bg: 'bg-yellow-50' },
     { label: 'Avg Rating', value: (drivers.reduce((a, d) => a + d.rating, 0) / drivers.length).toFixed(1), icon: <Star size={18} className="text-orange-500" />, bg: 'bg-orange-50' },
   ];
-
-  const Field = ({ label, k, type = 'text' }: { label: string; k: keyof typeof form; type?: string }) => (
-    <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
-      <input type={type} value={String(form[k])} onChange={e => setForm(f => ({ ...f, [k]: type === 'number' ? Number(e.target.value) : e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -137,9 +154,9 @@ export default function DriversPage() {
               <button onClick={() => setModal(null)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
             </div>
             <div className="p-6 grid grid-cols-2 gap-4">
-              <Field label="Full Name" k="name" /><Field label="Email" k="email" type="email" />
-              <Field label="Phone" k="phone" type="tel" /><Field label="License No." k="licenseNo" />
-              <Field label="Truck ID" k="truckId" /><Field label="Join Date" k="joinDate" type="date" />
+              <DriverField label="Full Name" k="name" form={form} setForm={setForm} /><DriverField label="Email" k="email" type="email" form={form} setForm={setForm} />
+              <DriverField label="Phone" k="phone" type="tel" form={form} setForm={setForm} /><DriverField label="License No." k="licenseNo" form={form} setForm={setForm} />
+              <DriverField label="Truck ID" k="truckId" form={form} setForm={setForm} /><DriverField label="Join Date" k="joinDate" type="date" form={form} setForm={setForm} />
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Zone</label>
                 <select value={form.zone} onChange={e => setForm(f => ({ ...f, zone: e.target.value }))} className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
