@@ -39,10 +39,12 @@ function AuthCallbackContent() {
 
         const onboardingDone = localStorage.getItem('onboarding_completed');
         if (!onboardingDone) {
-          router.push('/onboarding');
+          router.push('/company-onboarding');
         } else {
           router.push('/company-status');
         }
+      } else if (role === 'WASTE_COLLECTOR') {
+        router.push('/company-onboarding');
       } else if (role === 'CITIZEN') {
         router.push('/User-Dashboard');
       } else {

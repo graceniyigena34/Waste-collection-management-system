@@ -41,7 +41,7 @@ export default function Signin() {
 
     const roleMap: Record<string, string> = {
       citizen: "CITIZEN",
-      collector: "DRIVER",
+      collector: "WASTE_COLLECTOR",
       admin: "ADMIN",
     };
     const userInfo = {
@@ -54,7 +54,7 @@ export default function Signin() {
 
     setLoading(false);
     if (formData.role === "admin") router.push("/admin");
-    else if (formData.role === "collector") router.push("/driver");
+    else if (formData.role === "collector") router.push("/company-status");
     else {
       // Citizen: check if household details already submitted
       const submitted = localStorage.getItem("household_details_submitted");
@@ -167,7 +167,7 @@ export default function Signin() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition bg-white"
                 >
                   <option value="citizen">Citizen</option>
-                  <option value="collector">Waste Collector (Driver)</option>
+                  <option value="collector">Waste Collector</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
