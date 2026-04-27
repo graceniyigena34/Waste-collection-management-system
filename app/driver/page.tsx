@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { useCompanyApplication, useCompanyUserInfo } from '@/lib/company-application';
 
 interface CollectionSession {
   id: string;
@@ -49,6 +50,8 @@ interface DriverStats {
 
 export default function DriverDashboard() {
   const router = useRouter();
+  const userInfo = useCompanyUserInfo();
+  const application = useCompanyApplication(userInfo?.email ?? null);
   const [currentSession, setCurrentSession] = useState<CollectionSession | null>(null);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [sessionTime, setSessionTime] = useState(0);
@@ -100,6 +103,25 @@ export default function DriverDashboard() {
       estimatedTime: '3h 15m'
     },
   ]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+
+    if (!token || !userInfo) {
+      router.push('/signin');
+      return;
+    }
+
+    if (userInfo.role === 'WASTE_COLLECTOR') {
+      if (!application) {
+        router.push('/company-onboarding');
+      } else if (application.status === 'approved') {
+        router.push('/wasteCompanyDashboard');
+      } else {
+        router.push('/company-status');
+      }
+    }
+  }, [router, userInfo, application]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -164,6 +186,14 @@ export default function DriverDashboard() {
     localStorage.removeItem('user_info');
     router.push('/signin');
   };
+
+  if (!userInfo || userInfo.role === 'WASTE_COLLECTOR') {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">

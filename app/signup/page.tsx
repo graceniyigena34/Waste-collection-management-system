@@ -58,16 +58,18 @@ export default function Signup() {
     setLoading(false);
 
     // Store basic user info so household-details page knows who is registering
-    const roleMap: Record<string, string> = { citizen: "CITIZEN", collector: "DRIVER", admin: "ADMIN" };
+    const roleMap: Record<string, string> = { citizen: "CITIZEN", collector: "WASTE_COLLECTOR", admin: "ADMIN" };
     const userInfo = { fullName, email, role: roleMap[formData.role] };
     localStorage.setItem("auth_token", "mock_token_123");
     localStorage.setItem("user_info", JSON.stringify(userInfo));
 
-    // Citizens must fill household details first; others go straight to signin
+    // Citizens and waste collectors continue directly to their required onboarding.
     if (formData.role === "citizen") {
       // Always send citizen to household-details after signup so they fill the form
       localStorage.removeItem("household_details_submitted");
       router.push("/household-details");
+    } else if (formData.role === "collector") {
+      router.push("/company-onboarding");
     } else {
       router.push("/signin");
     }
