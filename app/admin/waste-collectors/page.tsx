@@ -20,11 +20,11 @@ interface Collector {
 type CollectorForm = Omit<Collector, 'id'>;
 
 const initialCollectors: Collector[] = [
-  { id: 'WC-001', name: 'Nkurunziza Pierre', email: 'pierre@greenex.rw', phone: '+250 788 101 001', licenseNo: 'RW-2021-001', zone: 'Kicukiro', status: 'Active', truckId: 'TRK-01', joinDate: '2023-01-15', completedRoutes: 245, rating: 4.8 },
-  { id: 'WC-002', name: 'Uwase Claudine', email: 'claudine@greenex.rw', phone: '+250 788 102 002', licenseNo: 'RW-2021-002', zone: 'Gasabo', status: 'Active', truckId: 'TRK-02', joinDate: '2023-03-20', completedRoutes: 198, rating: 4.6 },
-  { id: 'WC-003', name: 'Hakizimana Robert', email: 'robert@greenex.rw', phone: '+250 788 103 003', licenseNo: 'RW-2022-003', zone: 'Nyarugenge', status: 'Off Duty', truckId: 'TRK-03', joinDate: '2023-06-10', completedRoutes: 156, rating: 4.5 },
-  { id: 'WC-004', name: 'Mutesi Diane', email: 'diane@greenex.rw', phone: '+250 788 104 004', licenseNo: 'RW-2022-004', zone: 'Remera', status: 'Active', truckId: 'TRK-04', joinDate: '2023-08-05', completedRoutes: 178, rating: 4.7 },
-  { id: 'WC-005', name: 'Bizumuremyi Alex', email: 'alex@greenex.rw', phone: '+250 788 105 005', licenseNo: 'RW-2023-005', zone: 'Kicukiro', status: 'Suspended', truckId: 'N/A', joinDate: '2024-01-12', completedRoutes: 45, rating: 3.2 },
+  { id: 'WC-001', name: 'Nkurunziza Pierre', email: 'pierre@EcoTrack.rw', phone: '+250 788 101 001', licenseNo: 'RW-2021-001', zone: 'Kicukiro', status: 'Active', truckId: 'TRK-01', joinDate: '2023-01-15', completedRoutes: 245, rating: 4.8 },
+  { id: 'WC-002', name: 'Uwase Claudine', email: 'claudine@EcoTrack.rw', phone: '+250 788 102 002', licenseNo: 'RW-2021-002', zone: 'Gasabo', status: 'Active', truckId: 'TRK-02', joinDate: '2023-03-20', completedRoutes: 198, rating: 4.6 },
+  { id: 'WC-003', name: 'Hakizimana Robert', email: 'robert@EcoTrack.rw', phone: '+250 788 103 003', licenseNo: 'RW-2022-003', zone: 'Nyarugenge', status: 'Off Duty', truckId: 'TRK-03', joinDate: '2023-06-10', completedRoutes: 156, rating: 4.5 },
+  { id: 'WC-004', name: 'Mutesi Diane', email: 'diane@EcoTrack.rw', phone: '+250 788 104 004', licenseNo: 'RW-2022-004', zone: 'Remera', status: 'Active', truckId: 'TRK-04', joinDate: '2023-08-05', completedRoutes: 178, rating: 4.7 },
+  { id: 'WC-005', name: 'Bizumuremyi Alex', email: 'alex@EcoTrack.rw', phone: '+250 788 105 005', licenseNo: 'RW-2023-005', zone: 'Kicukiro', status: 'Suspended', truckId: 'N/A', joinDate: '2024-01-12', completedRoutes: 45, rating: 3.2 },
 ];
 
 const statusStyle: Record<string, string> = {

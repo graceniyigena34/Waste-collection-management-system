@@ -50,7 +50,7 @@ const AboutSection: React.FC = () => {
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center mb-12 lg:mb-20">
           <div className="relative w-full order-2 lg:order-1">
             <div className="absolute left-[38%] top-1/2 -translate-y-1/2 z-30 rounded-full bg-light-bg shadow-xl w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 flex items-center justify-center cursor-pointer text-foreground font-semibold text-sm sm:text-base lg:text-lg transition-all duration-300 hover:scale-110 dark:bg-gray-800">
-              GreenEx
+              EcoTrack
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
               <div className="col-span-1 sm:col-span-2 flex flex-col gap-2 sm:gap-4">
@@ -86,7 +86,7 @@ const AboutSection: React.FC = () => {
               About Us
             </h2>
             <p className="text-gray-700 dark:text-foreground text-base sm:text-lg leading-relaxed">
-              Greenex is a digital platform created to transform how waste is collected,
+              EcoTrack is a digital platform created to transform how waste is collected,
               tracked, and managed across Rwanda. It bridges the gap between
               households, companies, and private garbage collection companies by
               providing a modern and reliable technology solution.
@@ -106,7 +106,7 @@ const AboutSection: React.FC = () => {
             Our Mission
           </h3>
           <p className="text-white text-base sm:text-lg lg:text-xl leading-relaxed max-w-4xl mx-auto mb-6 sm:mb-8 px-2">
-            GreenEx is committed to revolutionizing waste collection in
+            EcoTrack is committed to revolutionizing waste collection in
             Rwanda&apos;s technology. We empower citizens, companies, and
             private garbage collectors for a cleaner, healthier, and more
             sustainable future. Our vision is a Rwanda where smart waste
@@ -118,7 +118,7 @@ const AboutSection: React.FC = () => {
           </div>
 
           <p className="text-white/90 text-xs sm:text-sm font-medium">
-            GreenEx - for sustainable Rwanda
+            EcoTrack - for sustainable Rwanda
           </p>
         </div>
 

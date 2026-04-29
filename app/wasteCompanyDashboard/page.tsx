@@ -57,7 +57,7 @@ export default function WasteCompanyDashboard() {
             <Truck size={18} className="text-white" />
           </div>
           <div>
-            <p className="font-bold text-gray-900 text-sm">GreenEx</p>
+            <p className="font-bold text-gray-900 text-sm">EcoTrack</p>
             <p className="text-xs text-gray-500">Waste Collector Dashboard</p>
           </div>
         </div>

@@ -31,7 +31,7 @@ export default function PrivacyPage() {
                         PRIVACY POLICY
                     </h1>
                     <p className="text-gray-600 dark:text-gray-400 text-base sm:text-lg max-w-3xl mx-auto px-4">
-                        Your privacy matters to us. This policy explains how we collect, use, and protect your personal information when you use the GreenEx platform.
+                        Your privacy matters to us. This policy explains how we collect, use, and protect your personal information when you use the EcoTrack platform.
                     </p>
                 </div>
 
@@ -216,8 +216,8 @@ export default function PrivacyPage() {
                                 If you have any questions or concerns about this Privacy Policy or our data practices, please contact us:
                             </p>
                             <div className="bg-primary-green/5 dark:bg-primary-green/10 rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-primary-green/20">
-                                <p className="font-semibold text-gray-900 dark:text-white mb-1">GreenEx Privacy Team</p>
-                                <p className="text-sm sm:text-base">Email: privacy@greenex.rw</p>
+                                <p className="font-semibold text-gray-900 dark:text-white mb-1">EcoTrack Privacy Team</p>
+                                <p className="text-sm sm:text-base">Email: privacy@EcoTrack.rw</p>
                                 <p className="text-sm sm:text-base">Phone: +250 XXX XXX XXX</p>
                                 <p className="mt-2 text-xs sm:text-sm">Address: Kigali, Rwanda</p>
                             </div>
@@ -262,7 +262,7 @@ export default function PrivacyPage() {
             <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 mt-12 sm:mt-16 lg:mt-20">
                 <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 text-center">
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        © 2026 GreenEx. All rights reserved.
+                        © 2026 EcoTrack. All rights reserved.
                     </p>
                 </div>
             </footer>

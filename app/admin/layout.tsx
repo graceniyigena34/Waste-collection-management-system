@@ -39,7 +39,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
             <Truck size={20} className="text-white" />
           </div>
-          <span className="text-xl font-bold tracking-wide">GreenEx</span>
+          <span className="text-xl font-bold tracking-wide">EcoTrack</span>
         </div>
 
         <div className="px-6 py-4 border-b border-green-700">
@@ -47,7 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="w-9 h-9 bg-orange-400 rounded-full flex items-center justify-center font-bold text-sm">AD</div>
             <div>
               <p className="text-sm font-semibold">Administrator</p>
-              <p className="text-xs text-green-300">admin@greenex.rw</p>
+              <p className="text-xs text-green-300">admin@EcoTrack.rw</p>
             </div>
           </div>
         </div>

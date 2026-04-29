@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 const HomeSection: React.FC = () => {
   const [typedText, setTypedText] = useState("");
   const [isTypingDone, setIsTypingDone] = useState(false);
-  const fullText = "GreenEx";
+  const fullText = "EcoTrack";
   const router = useRouter();
 
   useEffect(() => {

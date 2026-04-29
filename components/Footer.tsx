@@ -60,7 +60,7 @@ const Footer: React.FC = () => {
             <div className="col-span-1 sm:col-span-2 lg:col-span-1">
               <div className="flex items-center gap-3 mb-4 sm:mb-6">
                 <Truck size={32} className="sm:w-10 sm:h-10 text-secondary-green" />
-                <h2 className="text-2xl sm:text-3xl font-bold">GreenEx</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold">EcoTrack</h2>
               </div>
               <p className="text-gray-600 dark:text-gray-400 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
                 Transforming waste management in Rwanda through innovative technology and sustainable practices.
@@ -136,8 +136,8 @@ const Footer: React.FC = () => {
                 <div className="flex items-center gap-3 sm:gap-4">
                   <Mail className="w-5 h-5 sm:w-6 sm:h-6 text-secondary-green flex-shrink-0" />
                   <div>
-                    <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">info@greenex.rw</p>
-                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">greenex@rwandaclean.com</p>
+                    <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">info@EcoTrack.rw</p>
+                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">EcoTrack@rwandaclean.com</p>
                   </div>
                 </div>
               </div>
@@ -168,7 +168,7 @@ const Footer: React.FC = () => {
           <div className="flex flex-col md:flex-row justify-center text-center items-center gap-4 sm:gap-6">
             <div className="text-gray-600 dark:text-gray-400 text-center md:text-left">
               <p className="text-sm sm:text-base lg:text-lg">
-                © 2025 GreenEx - Creating a cleaner Rwanda through technology
+                © 2025 EcoTrack - Creating a cleaner Rwanda through technology
               </p>
             </div>
             <div className="flex gap-6 sm:gap-8 text-xs sm:text-sm font-semibold opacity-70">

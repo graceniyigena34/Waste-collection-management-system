@@ -149,7 +149,7 @@ export default function CompanyOnboardingPage() {
           <div className="w-9 h-9 bg-green-700 rounded-xl flex items-center justify-center">
             <Truck size={18} className="text-white" />
           </div>
-          <span className="font-bold text-gray-900">GreenEx</span>
+          <span className="font-bold text-gray-900">EcoTrack</span>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/company-status")} className="text-sm text-green-700 font-medium hover:underline">
@@ -181,7 +181,7 @@ export default function CompanyOnboardingPage() {
           {/* ── 1. Company Details ── */}
           <Section title="Company Details" icon={<Building2 size={17} className="text-green-600" />}>
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Company name *" value={profile.companyName} onChange={(v) => set("companyName", v)} placeholder="e.g. GreenEx Ltd" />
+              <Field label="Company name *" value={profile.companyName} onChange={(v) => set("companyName", v)} placeholder="e.g. EcoTrack Ltd" />
               <Field label="Company email *" value={profile.companyEmail} onChange={(v) => set("companyEmail", v)} placeholder="company@example.com" />
               <Field label="Company phone *" value={profile.companyPhone} onChange={(v) => set("companyPhone", v)} placeholder="+250 7xx xxx xxx" />
               <Field label="TIN / Registration number" value={profile.managerIdNumber} onChange={(v) => set("managerIdNumber", v)} placeholder="Tax Identification Number" />

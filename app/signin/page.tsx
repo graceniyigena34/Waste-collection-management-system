@@ -69,7 +69,7 @@ export default function Signin() {
       <div className="hidden lg:flex lg:w-1/2 relative flex-col items-center justify-center overflow-hidden">
         <Image
           src="/landingImage.png"
-          alt="GreenEx"
+          alt="EcoTrack"
           fill
           sizes="50vw"
           className="object-cover"
@@ -79,7 +79,7 @@ export default function Signin() {
         <div className="relative z-10 text-center px-12">
           <div className="flex items-center justify-center gap-3 mb-6">
             <Truck size={48} className="text-green-300" />
-            <h1 className="text-5xl font-extrabold text-white tracking-wide">GreenEx</h1>
+            <h1 className="text-5xl font-extrabold text-white tracking-wide">EcoTrack</h1>
           </div>
           <p className="text-green-100 text-xl font-light leading-relaxed max-w-sm mx-auto">
             Smarter waste management for a sustainable future across Rwanda.
@@ -101,11 +101,11 @@ export default function Signin() {
           {/* Mobile logo */}
           <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
             <Truck size={32} className="text-green-700" />
-            <h1 className="text-2xl font-bold text-green-700">GreenEx</h1>
+            <h1 className="text-2xl font-bold text-green-700">EcoTrack</h1>
           </div>
 
           <h2 className="text-3xl font-bold text-gray-900 mb-1">Welcome back</h2>
-          <p className="text-gray-500 mb-8 text-sm">Sign in to your GreenEx account</p>
+          <p className="text-gray-500 mb-8 text-sm">Sign in to your EcoTrack account</p>
 
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-lg mb-6">
