@@ -5,13 +5,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import {
   Truck, Users, DollarSign, MapPin, CreditCard,
   MessageSquare, BarChart3, Settings, Home,
-  LogOut, Bell, Menu, X, ChevronRight,
+  LogOut, Bell, Menu, X, ChevronRight, ClipboardList,
 } from 'lucide-react';
 
 const navItems = [
   { label: 'Dashboard', icon: Home, href: '/admin' },
   { label: 'Households', icon: Users, href: '/admin/households' },
-  { label: 'Drivers', icon: Truck, href: '/admin/drivers' },
+  { label: 'Waste Collectors', icon: Truck, href: '/admin/waste-collectors' },
+  { label: 'Applications', icon: ClipboardList, href: '/admin/applications' },
   { label: 'Routes', icon: MapPin, href: '/admin/routes' },
   { label: 'Payments', icon: CreditCard, href: '/admin/payments' },
   { label: 'Complaints', icon: MessageSquare, href: '/admin/complaints' },
