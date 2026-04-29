@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import {
   Truck, Users, DollarSign, AlertTriangle, TrendingUp,
   BarChart3, FileText, MapPin, CreditCard, MessageSquare,
-  ArrowUpRight, ArrowDownRight, Clock,
+  ArrowUpRight, ArrowDownRight, Clock, ClipboardList,
 } from 'lucide-react';
 
 const stats = [
@@ -16,7 +16,7 @@ const stats = [
 ];
 
 const secondaryStats = [
-  { label: 'Active Drivers', value: '24', icon: <Users size={18} className="text-blue-500" />, bg: 'bg-blue-50' },
+  { label: 'Active Waste Collectors', value: '24', icon: <Users size={18} className="text-blue-500" />, bg: 'bg-blue-50' },
   { label: 'Fleet Size', value: '18 trucks', icon: <Truck size={18} className="text-green-500" />, bg: 'bg-green-50' },
   { label: 'Efficiency Rate', value: '87%', icon: <TrendingUp size={18} className="text-purple-500" />, bg: 'bg-purple-50' },
   { label: 'Zones Covered', value: '20', icon: <MapPin size={18} className="text-orange-500" />, bg: 'bg-orange-50' },
@@ -165,7 +165,8 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: 'Households', icon: Users, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100', href: '/admin/households' },
-            { label: 'Drivers', icon: Truck, color: 'text-green-600 bg-green-50 hover:bg-green-100', href: '/admin/drivers' },
+            { label: 'Waste Collectors', icon: Truck, color: 'text-green-600 bg-green-50 hover:bg-green-100', href: '/admin/waste-collectors' },
+            { label: 'Applications', icon: ClipboardList, color: 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100', href: '/admin/applications' },
             { label: 'Routes', icon: MapPin, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100', href: '/admin/routes' },
             { label: 'Payments', icon: CreditCard, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', href: '/admin/payments' },
             { label: 'Complaints', icon: MessageSquare, color: 'text-red-600 bg-red-50 hover:bg-red-100', href: '/admin/complaints' },
