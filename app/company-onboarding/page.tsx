@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import {
   CompanyApplicationProfile, CompanyCarInput, CompanyDriverInput,
-  saveCompanyApplication, useCompanyApplication, useCompanyUserInfo,
+  isWasteCollectorRole, saveCompanyApplication, useCompanyApplication, useCompanyUserInfo,
 } from "@/lib/company-application";
 
 const emptyDriver: CompanyDriverInput = {
@@ -56,7 +56,7 @@ export default function CompanyOnboardingPage() {
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    if (!token || !userInfo || userInfo.role !== "WASTE_COLLECTOR") {
+    if (!token || !userInfo || !isWasteCollectorRole(userInfo.role)) {
       router.push("/signin");
       return;
     }
@@ -99,28 +99,38 @@ export default function CompanyOnboardingPage() {
     docs: profile.certificates.length + profile.rdbCertificates.length + profile.taxCertificates.length,
   }), [profile]);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const getValidationErrors = (): string[] => {
+    const errors: string[] = [];
+
     if (!profile.companyName || !profile.companyEmail || !profile.companyPhone || !profile.ownerName || !profile.ownerEmail || !profile.ownerPhone || !profile.managerName || !profile.managerEmail || !profile.managerPhone) {
-      setError("Please complete all required company, owner, and manager fields.");
-      return;
+      errors.push("Complete all required company, owner, and manager fields.");
     }
     if (profile.drivers.length === 0) {
-      setError("Please add at least one driver.");
-      return;
-    }
-    if (profile.certificates.length === 0 && profile.rdbCertificates.length === 0 && profile.taxCertificates.length === 0) {
-      setError("Please upload at least one certificate document.");
-      return;
-    }
-    if (profile.companyImages.length === 0) {
-      setError("Please upload at least one company image.");
-      return;
+      errors.push("Add at least one driver.");
     }
     if (profile.cars.length === 0) {
-      setError("Please add at least one vehicle.");
+      errors.push("Add at least one vehicle.");
+    }
+    if (profile.certificates.length === 0 && profile.rdbCertificates.length === 0 && profile.taxCertificates.length === 0) {
+      errors.push("Upload at least one certificate document.");
+    }
+    if (profile.companyImages.length === 0) {
+      errors.push("Upload at least one company image.");
+    }
+
+    return errors;
+  };
+
+  const validationErrors = getValidationErrors();
+
+  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (validationErrors.length > 0) {
+      setError(`Please fix the following before submitting: ${validationErrors[0]}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+
     setSaving(true);
     saveCompanyApplication(profile);
     setSaving(false);
@@ -133,7 +143,7 @@ export default function CompanyOnboardingPage() {
     router.push("/signin");
   };
 
-  if (!userInfo || userInfo.role !== "WASTE_COLLECTOR") {
+  if (!userInfo || !isWasteCollectorRole(userInfo.role)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600" />
@@ -334,6 +344,17 @@ export default function CompanyOnboardingPage() {
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-700 px-8 py-3 text-sm font-semibold text-white transition hover:bg-green-800 disabled:opacity-60 disabled:cursor-not-allowed">
               {saving ? "Submitting..." : <>Submit for approval <ArrowRight size={16} /></>}
             </button>
+            {!saving && validationErrors.length > 0 && (
+              <div className="md:basis-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                <p className="font-semibold">Submission requirements</p>
+                <p className="mt-1">Please complete the following:</p>
+                <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                  {validationErrors.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </form>
       </div>

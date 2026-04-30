@@ -71,6 +71,12 @@ export interface UserInfo {
   userId?: string;
 }
 
+export const normalizeRole = (role?: string | null): string =>
+  typeof role === 'string' ? role.trim().toLowerCase() : '';
+
+export const isWasteCollectorRole = (role?: string | null): boolean =>
+  normalizeRole(role) === 'waste_collector';
+
 export const COMPANY_APPLICATIONS_STORAGE_KEY = 'company_applications';
 export const COMPANY_PROFILE_STORAGE_KEY = 'company_application_profile';
 export const COMPANY_STATUS_STORAGE_KEY = 'company_application_status';
