@@ -6,7 +6,7 @@ import {
   Building2, BadgeCheck, Users, FileText, MapPin,
   Car, ShieldCheck, LogOut, Phone, Mail, User, Truck,
 } from "lucide-react";
-import { useCurrentCompanyApplication, useCompanyUserInfo } from "@/lib/company-application";
+import { isWasteCollectorRole, useCurrentCompanyApplication, useCompanyUserInfo } from "@/lib/company-application";
 
 export default function WasteCompanyDashboard() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function WasteCompanyDashboard() {
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    if (!token || !userInfo || userInfo.role !== "WASTE_COLLECTOR") {
+    if (!token || !userInfo || !isWasteCollectorRole(userInfo.role)) {
       router.push("/signin");
       return;
     }
@@ -31,7 +31,7 @@ export default function WasteCompanyDashboard() {
     router.push("/signin");
   };
 
-  if (!userInfo || userInfo.role !== "WASTE_COLLECTOR" || !application || application.status !== "approved") {
+  if (!userInfo || !isWasteCollectorRole(userInfo.role) || !application || application.status !== "approved") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600" />
@@ -57,7 +57,7 @@ export default function WasteCompanyDashboard() {
             <Truck size={18} className="text-white" />
           </div>
           <div>
-            <p className="font-bold text-gray-900 text-sm">GreenEx</p>
+            <p className="font-bold text-gray-900 text-sm">EcoTrack</p>
             <p className="text-xs text-gray-500">Waste Collector Dashboard</p>
           </div>
         </div>

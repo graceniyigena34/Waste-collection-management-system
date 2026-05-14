@@ -42,7 +42,7 @@ export function SuccessStep({ companyData, onGoHome }: SuccessStepProps) {
           </h2>
 
           <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Thank you for joining GreenEx. You&#39;re one step closer to powering Rwanda&#39;s sustainable future.
+            Thank you for joining EcoTrack. You&#39;re one step closer to powering Rwanda&#39;s sustainable future.
           </p>
         </div>
 

@@ -13,7 +13,7 @@ const Home: React.FC = () => {
     pathname === path ? "underline underline-offset-8 text-emerald-300" : "";
 
 
-  const fullText = "GreenEx";
+  const fullText = "EcoTrack";
   const [typedText, setTypedText] = useState("");
   const [isTypingDone, setIsTypingDone] = useState(false);
 
@@ -51,7 +51,7 @@ const Home: React.FC = () => {
         <div className="flex items-center gap-2">
           <Truck size={45} className="text-white" />
           <h1 className="text-white text-2xl md:text-3xl font-bold tracking-wide">
-            GreenEx
+            EcoTrack
           </h1>
         </div>
         <div className="hidden md:flex items-center">

@@ -102,7 +102,7 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
             whileHover={{ scale: 1.05 }}
             transition={{ duration: 0.2 }}
           >
-            GreenEx
+            EcoTrack
           </motion.h1>
         </motion.div>
 

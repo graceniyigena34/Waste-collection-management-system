@@ -34,7 +34,7 @@ export default function Header() {
         {/* Row 1: Logo + Title */}
         <div className="flex items-center gap-3">
           <Truck size={40} className="text-secondary-green" />
-          <h1 className="text-xl font-bold">GreenEX</h1>
+          <h1 className="text-xl font-bold">EcoTrack</h1>
         </div>
 
         {/* Row 2: Subtitle */}

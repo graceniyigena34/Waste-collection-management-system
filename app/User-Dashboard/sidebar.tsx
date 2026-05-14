@@ -24,7 +24,7 @@ export default function Sidebar() {
         <div className="flex items-center gap-3 mb-6">
           <Truck size={40} className="text-secondary-green" />
         </div>
-        <span className="text-xl font-bold">GreenEX</span>
+        <span className="text-xl font-bold">EcoTrack</span>
       </div>
 
       <nav className="p-4">

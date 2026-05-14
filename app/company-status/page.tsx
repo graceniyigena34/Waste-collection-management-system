@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, BadgeCheck, Ban, Building2, Clock3, FileText } from "lucide-react";
-import { useCompanyApplication, useCompanyUserInfo } from "@/lib/company-application";
+import { isWasteCollectorRole, useCompanyApplication, useCompanyUserInfo } from "@/lib/company-application";
 
 export default function CompanyStatusPage() {
   const router = useRouter();
@@ -13,7 +13,7 @@ export default function CompanyStatusPage() {
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
 
-    if (!token || !userInfo || userInfo.role !== "WASTE_COLLECTOR") {
+    if (!token || !userInfo || !isWasteCollectorRole(userInfo.role)) {
       router.push("/signin");
       return;
     }
@@ -23,7 +23,7 @@ export default function CompanyStatusPage() {
     }
   }, [router, userInfo, application]);
 
-  if (!userInfo || userInfo.role !== "WASTE_COLLECTOR") {
+  if (!userInfo || !isWasteCollectorRole(userInfo.role)) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600" />

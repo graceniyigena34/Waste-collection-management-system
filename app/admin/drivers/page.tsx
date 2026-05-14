@@ -42,11 +42,11 @@ function DriverField({ label, k, type = 'text', form, setForm }: DriverFieldProp
 }
 
 const initialDrivers: Driver[] = [
-  { id: 'DRV-001', name: 'Nkurunziza Pierre', email: 'pierre@greenex.rw', phone: '+250 788 101 001', licenseNo: 'RW-2021-001', zone: 'Kicukiro', status: 'Active', truckId: 'TRK-01', joinDate: '2023-01-15', completedRoutes: 245, rating: 4.8 },
-  { id: 'DRV-002', name: 'Uwase Claudine', email: 'claudine@greenex.rw', phone: '+250 788 102 002', licenseNo: 'RW-2021-002', zone: 'Gasabo', status: 'Active', truckId: 'TRK-02', joinDate: '2023-03-20', completedRoutes: 198, rating: 4.6 },
-  { id: 'DRV-003', name: 'Hakizimana Robert', email: 'robert@greenex.rw', phone: '+250 788 103 003', licenseNo: 'RW-2022-003', zone: 'Nyarugenge', status: 'Off Duty', truckId: 'TRK-03', joinDate: '2023-06-10', completedRoutes: 156, rating: 4.5 },
-  { id: 'DRV-004', name: 'Mutesi Diane', email: 'diane@greenex.rw', phone: '+250 788 104 004', licenseNo: 'RW-2022-004', zone: 'Remera', status: 'Active', truckId: 'TRK-04', joinDate: '2023-08-05', completedRoutes: 178, rating: 4.7 },
-  { id: 'DRV-005', name: 'Bizumuremyi Alex', email: 'alex@greenex.rw', phone: '+250 788 105 005', licenseNo: 'RW-2023-005', zone: 'Kicukiro', status: 'Suspended', truckId: 'N/A', joinDate: '2024-01-12', completedRoutes: 45, rating: 3.2 },
+  { id: 'DRV-001', name: 'Nkurunziza Pierre', email: 'pierre@EcoTrack.rw', phone: '+250 788 101 001', licenseNo: 'RW-2021-001', zone: 'Kicukiro', status: 'Active', truckId: 'TRK-01', joinDate: '2023-01-15', completedRoutes: 245, rating: 4.8 },
+  { id: 'DRV-002', name: 'Uwase Claudine', email: 'claudine@EcoTrack.rw', phone: '+250 788 102 002', licenseNo: 'RW-2021-002', zone: 'Gasabo', status: 'Active', truckId: 'TRK-02', joinDate: '2023-03-20', completedRoutes: 198, rating: 4.6 },
+  { id: 'DRV-003', name: 'Hakizimana Robert', email: 'robert@EcoTrack.rw', phone: '+250 788 103 003', licenseNo: 'RW-2022-003', zone: 'Nyarugenge', status: 'Off Duty', truckId: 'TRK-03', joinDate: '2023-06-10', completedRoutes: 156, rating: 4.5 },
+  { id: 'DRV-004', name: 'Mutesi Diane', email: 'diane@EcoTrack.rw', phone: '+250 788 104 004', licenseNo: 'RW-2022-004', zone: 'Remera', status: 'Active', truckId: 'TRK-04', joinDate: '2023-08-05', completedRoutes: 178, rating: 4.7 },
+  { id: 'DRV-005', name: 'Bizumuremyi Alex', email: 'alex@EcoTrack.rw', phone: '+250 788 105 005', licenseNo: 'RW-2023-005', zone: 'Kicukiro', status: 'Suspended', truckId: 'N/A', joinDate: '2024-01-12', completedRoutes: 45, rating: 3.2 },
 ];
 
 const statusStyle: Record<string, string> = { Active: 'bg-green-100 text-green-700', 'Off Duty': 'bg-yellow-100 text-yellow-700', Suspended: 'bg-red-100 text-red-700' };

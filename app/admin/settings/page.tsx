@@ -10,7 +10,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('Profile');
   const [saved, setSaved] = useState(false);
 
-  const [profile, setProfile] = useState({ name: 'Administrator', email: 'admin@greenex.rw', phone: '+250 799 5586', organization: 'GreenEx Rwanda', role: 'Super Admin' });
+  const [profile, setProfile] = useState({ name: 'Administrator', email: 'admin@EcoTrack.rw', phone: '+250 799 5586', organization: 'EcoTrack Rwanda', role: 'Super Admin' });
   const [system, setSystem] = useState({ collectionFee: '3000', currency: 'RWF', paymentDueDays: '15', maxComplaintsPerHousehold: '5', autoAssignDrivers: true, sendReminders: true });
   const [notifications, setNotifications] = useState({ emailAlerts: true, smsAlerts: true, newComplaint: true, paymentOverdue: true, missedCollection: true, driverOffDuty: false });
   const [zones, setZones] = useState(['Kicukiro', 'Gasabo', 'Nyarugenge', 'Remera']);
