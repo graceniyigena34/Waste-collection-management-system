@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Truck, Eye, EyeOff, Mail, Lock, User, ChevronDown } from "lucide-react";
 import Image from "next/image";
+import { api, storeAuth, type BackendRole } from "@/lib/api-client";
 
 interface SignupForm {
   fullName: string;
@@ -54,24 +55,35 @@ export default function Signup() {
 
     setError("");
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setLoading(false);
 
-    // Store basic user info so household-details page knows who is registering
-    const roleMap: Record<string, string> = { citizen: "CITIZEN", collector: "WASTE_COLLECTOR", admin: "ADMIN" };
-    const userInfo = { fullName, email, role: roleMap[formData.role] };
-    localStorage.setItem("auth_token", "mock_token_123");
-    localStorage.setItem("user_info", JSON.stringify(userInfo));
+    const backendRole: BackendRole =
+      role === "collector" ? "waste_collector" : role;
 
-    // Citizens and waste collectors continue directly to their required onboarding.
-    if (formData.role === "citizen") {
-      // Always send citizen to household-details after signup so they fill the form
-      localStorage.removeItem("household_details_submitted");
-      router.push("/household-details");
-    } else if (formData.role === "collector") {
-      router.push("/company-onboarding");
-    } else {
-      router.push("/signin");
+    try {
+      const res = await api.auth.register({
+        full_name: fullName.trim(),
+        email: email.trim(),
+        telephone: `+250 ${telephoneNumber.trim()}`,
+        password,
+        confirm_password: confirmPassword,
+        role: backendRole,
+      });
+
+      storeAuth(res);
+
+      if (backendRole === "citizen") {
+        localStorage.removeItem("household_details_submitted");
+        router.push("/household-details");
+      } else if (backendRole === "waste_collector") {
+        router.push("/company-onboarding");
+      } else {
+        router.push("/admin");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to create account.";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   };
 
