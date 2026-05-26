@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Truck, Eye, EyeOff, Mail, Lock, ChevronDown } from "lucide-react";
 import Image from "next/image";
+import { api, storeAuth } from "@/lib/api-client";
 
 interface SigninForm {
   email: string;
@@ -37,29 +38,32 @@ export default function Signin() {
     setError("");
     setLoading(true);
 
-    await new Promise((r) => setTimeout(r, 800));
+    try {
+      const res = await api.auth.login({
+        email: formData.email.trim(),
+        password: formData.password,
+      });
 
-    const roleMap: Record<string, string> = {
-      citizen: "CITIZEN",
-      collector: "WASTE_COLLECTOR",
-      admin: "ADMIN",
-    };
-    const userInfo = {
-      fullName: formData.email.split("@")[0],
-      email: formData.email,
-      role: roleMap[formData.role],
-    };
-    localStorage.setItem("auth_token", "mock_token_123");
-    localStorage.setItem("user_info", JSON.stringify(userInfo));
+      storeAuth(res);
 
-    setLoading(false);
-    if (formData.role === "admin") router.push("/admin");
-    else if (formData.role === "collector") router.push("/company-status");
-    else {
-      // Citizen: check if household details already submitted
+      if (res.user.role === "admin") {
+        router.push("/admin");
+        return;
+      }
+
+      if (res.user.role === "waste_collector") {
+        router.push("/company-status");
+        return;
+      }
+
       const submitted = localStorage.getItem("household_details_submitted");
       if (submitted === "true") router.push("/User-Dashboard");
       else router.push("/household-details");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to sign in.";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   };
 

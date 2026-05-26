@@ -11,6 +11,7 @@ import {
   getCellsBySector,
   getVillagesByCell,
 } from "@/data/rwanda-admin";
+import { api } from "@/lib/api-client";
 
 function getStoredUserFirstName() {
   if (typeof window === "undefined") return "there";
@@ -59,7 +60,9 @@ export default function HouseholdDetailsPage() {
     if (!raw) { router.push("/signin"); return; }
     try {
       const user = JSON.parse(raw);
-      if (user.role !== "CITIZEN") { router.push("/"); return; }
+      // backend stores role as lowercase "citizen"
+      const role = (user.role ?? "").toLowerCase();
+      if (role !== "citizen") { router.push("/"); return; }
     } catch {
       router.push("/signin");
     }
@@ -95,7 +98,7 @@ export default function HouseholdDetailsPage() {
     districtId && sectorId && cellId && villageId &&
     streetAddress.trim().length >= 5;
 
-  /* ── submit ── */
+  /* ── submit — calls real API ── */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
@@ -104,19 +107,26 @@ export default function HouseholdDetailsPage() {
       return;
     }
     setIsLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-
-    localStorage.setItem("household_details", JSON.stringify({
-      district: districtName, sector: sectorName,
-      cell: cellName, village: villageName,
-      streetAddress: streetAddress.trim(),
-      houseType, residents,
-      notes: notes.trim() || undefined,
-    }));
-    localStorage.setItem("household_details_submitted", "true");
-    setIsLoading(false);
-    toast.success("Household details saved! Redirecting to dashboard...");
-    setTimeout(() => router.push("/User-Dashboard"), 1000);
+    try {
+      await api.households.submit({
+        district: districtName,
+        sector: sectorName,
+        cell: cellName,
+        village: villageName,
+        street_address: streetAddress.trim(),
+        house_type: houseType,
+        residents,
+        notes: notes.trim() || undefined,
+      });
+      localStorage.setItem("household_details_submitted", "true");
+      toast.success("Household details saved! Redirecting to dashboard...");
+      setTimeout(() => router.push("/User-Dashboard"), 1000);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save details.";
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   /* ── shared classes ── */
