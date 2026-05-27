@@ -8,8 +8,9 @@ import {
 } from "lucide-react";
 import {
   CompanyApplicationProfile, CompanyCarInput, CompanyDriverInput,
-  isWasteCollectorRole, saveCompanyApplication, useCompanyApplication, useCompanyUserInfo,
+  isWasteCollectorRole,
 } from "@/lib/company-application";
+import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
 
 const emptyDriver: CompanyDriverInput = {
   name: "", email: "", phone: "", licenseNumber: "", nationalId: "",
@@ -36,8 +37,9 @@ const ZONES = ["Kicukiro", "Gasabo", "Nyarugenge", "Remera", "Bugesera", "Huye"]
 
 export default function CompanyOnboardingPage() {
   const router = useRouter();
-  const userInfo = useCompanyUserInfo();
-  const application = useCompanyApplication(userInfo?.email ?? null);
+  const userInfo = getStoredUserInfo();
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -48,11 +50,36 @@ export default function CompanyOnboardingPage() {
     managerEmail: userInfo?.email ?? "",
     ownerName: userInfo?.fullName ?? "",
     managerName: userInfo?.fullName ?? "",
-    ...(application ?? {}),
-    cars: application?.cars ?? [],
-    taxCertificates: application?.taxCertificates ?? [],
-    managerNationalId: application?.managerNationalId ?? "",
+    cars: [],
+    taxCertificates: [],
+    managerNationalId: "",
   }));
+
+  const mapBackendToProfile = (company: BackendCompanyProfile): CompanyApplicationProfile => ({
+    companyName: company.company_name || "",
+    companyEmail: company.email || "",
+    companyPhone: company.phone || "",
+    ownerName: company.owner_name || "",
+    ownerEmail: company.owner_email || "",
+    ownerPhone: company.owner_phone || "",
+    companyAddress: company.address || "",
+    companyDescription: company.description || "",
+    companyLogo: company.company_logo || "",
+    companyImages: Array.isArray(company.company_images) ? (company.company_images as string[]) : [],
+    certificates: Array.isArray(company.certificates) ? (company.certificates as string[]) : [],
+    rdbCertificates: Array.isArray(company.rdb_certificates) ? (company.rdb_certificates as string[]) : [],
+    taxCertificates: Array.isArray(company.tax_certificates) ? (company.tax_certificates as string[]) : [],
+    managerName: company.manager_name || "",
+    managerEmail: company.manager_email || "",
+    managerPhone: company.manager_phone || "",
+    managerPosition: company.manager_position || "",
+    managerIdNumber: company.tin || "",
+    managerNationalId: company.manager_national_id || "",
+    drivers: Array.isArray(company.drivers) ? (company.drivers as CompanyDriverInput[]) : [],
+    cars: Array.isArray(company.vehicles) ? (company.vehicles as CompanyCarInput[]) : [],
+    serviceAreas: Array.isArray(company.service_areas) ? (company.service_areas as string[]) : ["Kicukiro"],
+    notes: company.notes || "",
+  });
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -60,10 +87,29 @@ export default function CompanyOnboardingPage() {
       router.push("/signin");
       return;
     }
-    if (application?.status === "approved") {
-      router.push("/wasteCompanyDashboard");
-    }
-  }, [router, userInfo, application]);
+
+    const loadCompany = async () => {
+      if (!userInfo.email) {
+        setLoadingProfile(false);
+        return;
+      }
+
+      try {
+        const { company } = await api.companies.byEmail(userInfo.email);
+        setCompanyId(company.id);
+        setProfile((current) => ({ ...current, ...mapBackendToProfile(company) }));
+        if (company.status === "approved") {
+          router.push("/wasteCompanyDashboard");
+        }
+      } catch {
+        // No existing company profile yet.
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    void loadCompany();
+  }, [router, userInfo]);
 
   const set = (field: keyof CompanyApplicationProfile, value: string) => {
     setProfile((p) => ({ ...p, [field]: value }));
@@ -123,7 +169,7 @@ export default function CompanyOnboardingPage() {
 
   const validationErrors = getValidationErrors();
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (validationErrors.length > 0) {
       setError(`Please fix the following before submitting: ${validationErrors[0]}`);
@@ -132,9 +178,48 @@ export default function CompanyOnboardingPage() {
     }
 
     setSaving(true);
-    saveCompanyApplication(profile);
-    setSaving(false);
-    router.push("/company-status");
+    setError("");
+    try {
+      const payload = {
+        company_name: profile.companyName,
+        email: profile.companyEmail,
+        phone: profile.companyPhone,
+        owner_name: profile.ownerName,
+        owner_email: profile.ownerEmail,
+        owner_phone: profile.ownerPhone,
+        tin: profile.managerIdNumber,
+        address: profile.companyAddress,
+        description: profile.companyDescription,
+        company_logo: profile.companyLogo,
+        company_images: profile.companyImages,
+        manager_name: profile.managerName,
+        manager_email: profile.managerEmail,
+        manager_phone: profile.managerPhone,
+        manager_position: profile.managerPosition,
+        manager_national_id: profile.managerNationalId,
+        drivers: profile.drivers,
+        vehicles: profile.cars,
+        certificates: profile.certificates,
+        rdb_certificates: profile.rdbCertificates,
+        tax_certificates: profile.taxCertificates,
+        service_areas: profile.serviceAreas,
+        notes: profile.notes,
+      };
+
+      if (companyId) {
+        await api.companies.update(companyId, payload);
+      } else {
+        const created = await api.companies.create(payload);
+        setCompanyId(created.company.id);
+      }
+
+      router.push("/company-status");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to submit company profile.";
+      setError(message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleLogout = () => {
@@ -143,7 +228,7 @@ export default function CompanyOnboardingPage() {
     router.push("/signin");
   };
 
-  if (!userInfo || !isWasteCollectorRole(userInfo.role)) {
+  if (loadingProfile || !userInfo || !isWasteCollectorRole(userInfo.role)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600" />

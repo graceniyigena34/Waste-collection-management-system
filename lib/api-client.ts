@@ -31,6 +31,9 @@ export interface BackendCompanyProfile {
   company_name: string;
   email: string;
   phone: string;
+  owner_name?: string;
+  owner_email?: string;
+  owner_phone?: string;
   tin?: string;
   address?: string;
   description?: string;
@@ -38,12 +41,27 @@ export interface BackendCompanyProfile {
   sector?: string;
   cell?: string;
   village?: string;
+  company_logo?: string;
+  company_images?: Array<unknown>;
   company_type?: string;
   years_of_experience?: number;
   number_of_employees?: number;
+  manager_name?: string;
+  manager_email?: string;
+  manager_phone?: string;
+  manager_position?: string;
+  manager_national_id?: string;
+  drivers?: Array<unknown>;
   vehicles?: Array<unknown>;
   certificates?: Array<unknown>;
+  rdb_certificates?: Array<unknown>;
+  tax_certificates?: Array<unknown>;
+  service_areas?: Array<unknown>;
+  notes?: string;
   status: "pending" | "approved" | "rejected" | "suspended";
+  review_notes?: string;
+  reviewed_at?: string;
+  reviewed_by?: number;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -184,6 +202,9 @@ export const api = {
       company_name: string;
       email: string;
       phone: string;
+      owner_name?: string;
+      owner_email?: string;
+      owner_phone?: string;
       tin?: string;
       address?: string;
       description?: string;
@@ -191,11 +212,23 @@ export const api = {
       sector?: string;
       cell?: string;
       village?: string;
+      company_logo?: string;
+      company_images?: unknown[];
       company_type?: string;
       years_of_experience?: number;
       number_of_employees?: number;
+      manager_name?: string;
+      manager_email?: string;
+      manager_phone?: string;
+      manager_position?: string;
+      manager_national_id?: string;
+      drivers?: unknown[];
       vehicles?: unknown[];
       certificates?: unknown[];
+      rdb_certificates?: unknown[];
+      tax_certificates?: unknown[];
+      service_areas?: unknown[];
+      notes?: string;
     }) =>
       apiFetch<{ message: string; company: BackendCompanyProfile }>("/api/companies", {
         method: "POST",
@@ -203,9 +236,59 @@ export const api = {
         auth: true,
       }),
 
+    all: (limit = 100, offset = 0) =>
+      apiFetch<{ count: number; limit: number; offset: number; data: BackendCompanyProfile[] }>(
+        `/api/companies/all?limit=${limit}&offset=${offset}`,
+        {
+          method: "GET",
+          auth: true,
+        },
+      ),
+
     byEmail: (email: string) =>
       apiFetch<{ company: BackendCompanyProfile }>(`/api/companies/email/${encodeURIComponent(email)}`, {
         method: "GET",
+        auth: true,
+      }),
+
+    update: (
+      id: number,
+      payload: Partial<{
+        company_name: string;
+        email: string;
+        phone: string;
+        owner_name: string;
+        owner_email: string;
+        owner_phone: string;
+        tin: string;
+        address: string;
+        description: string;
+        district: string;
+        sector: string;
+        cell: string;
+        village: string;
+        company_logo: string;
+        company_images: unknown[];
+        company_type: string;
+        years_of_experience: number;
+        number_of_employees: number;
+        manager_name: string;
+        manager_email: string;
+        manager_phone: string;
+        manager_position: string;
+        manager_national_id: string;
+        drivers: unknown[];
+        vehicles: unknown[];
+        certificates: unknown[];
+        rdb_certificates: unknown[];
+        tax_certificates: unknown[];
+        service_areas: unknown[];
+        notes: string;
+      }>,
+    ) =>
+      apiFetch<{ message: string; company: BackendCompanyProfile }>(`/api/companies/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
         auth: true,
       }),
 
@@ -218,6 +301,14 @@ export const api = {
     approve: (id: number) =>
       apiFetch<{ message: string; company: BackendCompanyProfile }>(`/api/companies/${id}/approve`, {
         method: "PUT",
+        body: JSON.stringify({}),
+        auth: true,
+      }),
+
+    approveWithNotes: (id: number, review_notes?: string) =>
+      apiFetch<{ message: string; company: BackendCompanyProfile }>(`/api/companies/${id}/approve`, {
+        method: "PUT",
+        body: JSON.stringify({ review_notes }),
         auth: true,
       }),
 

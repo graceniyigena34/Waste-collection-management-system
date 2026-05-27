@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2, BadgeCheck, Users, FileText, MapPin,
   Car, ShieldCheck, LogOut, Phone, Mail, User, Truck,
 } from "lucide-react";
-import { isWasteCollectorRole, useCurrentCompanyApplication, useCompanyUserInfo } from "@/lib/company-application";
+import { isWasteCollectorRole } from "@/lib/company-application";
+import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
 
 export default function WasteCompanyDashboard() {
   const router = useRouter();
-  const userInfo = useCompanyUserInfo();
-  const application = useCurrentCompanyApplication();
+  const userInfo = getStoredUserInfo();
+  const [application, setApplication] = useState<BackendCompanyProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -19,11 +21,27 @@ export default function WasteCompanyDashboard() {
       router.push("/signin");
       return;
     }
-    if (!application) { router.push("/company-onboarding"); return; }
-    if (application.status === "pending" || application.status === "denied") {
-      router.push("/company-status");
-    }
-  }, [router, userInfo, application]);
+    const loadCompany = async () => {
+      if (!userInfo.email) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await api.companies.byEmail(userInfo.email);
+        setApplication(res.company);
+        if (res.company.status === "pending" || res.company.status === "rejected") {
+          router.push("/company-status");
+        }
+      } catch {
+        router.push("/company-onboarding");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadCompany();
+  }, [router, userInfo]);
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
@@ -31,7 +49,7 @@ export default function WasteCompanyDashboard() {
     router.push("/signin");
   };
 
-  if (!userInfo || !isWasteCollectorRole(userInfo.role) || !application || application.status !== "approved") {
+  if (loading || !userInfo || !isWasteCollectorRole(userInfo.role) || !application || application.status !== "approved") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600" />
@@ -39,12 +57,23 @@ export default function WasteCompanyDashboard() {
     );
   }
 
-  const totalDocs = application.certificates.length + application.rdbCertificates.length + (application.taxCertificates?.length ?? 0);
+  const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+  const mapped = {
+    drivers: asArray(application.drivers) as Array<Record<string, string>>,
+    cars: asArray(application.vehicles) as Array<Record<string, string>>,
+    certificates: asArray(application.certificates) as string[],
+    rdbCertificates: asArray(application.rdb_certificates) as string[],
+    taxCertificates: asArray(application.tax_certificates) as string[],
+    serviceAreas: asArray(application.service_areas) as string[],
+  };
+
+  const totalDocs = mapped.certificates.length + mapped.rdbCertificates.length + mapped.taxCertificates.length;
 
   const metrics = [
-    { label: "Drivers", value: application.drivers.length, icon: <Users size={20} className="text-blue-600" />, bg: "bg-blue-50" },
-    { label: "Vehicles", value: application.cars?.length ?? 0, icon: <Car size={20} className="text-purple-600" />, bg: "bg-purple-50" },
-    { label: "Service areas", value: application.serviceAreas.length, icon: <MapPin size={20} className="text-emerald-600" />, bg: "bg-emerald-50" },
+    { label: "Drivers", value: mapped.drivers.length, icon: <Users size={20} className="text-blue-600" />, bg: "bg-blue-50" },
+    { label: "Vehicles", value: mapped.cars.length, icon: <Car size={20} className="text-purple-600" />, bg: "bg-purple-50" },
+    { label: "Service areas", value: mapped.serviceAreas.length, icon: <MapPin size={20} className="text-emerald-600" />, bg: "bg-emerald-50" },
     { label: "Documents", value: totalDocs, icon: <FileText size={20} className="text-orange-500" />, bg: "bg-orange-50" },
   ];
 
@@ -72,14 +101,14 @@ export default function WasteCompanyDashboard() {
           <div className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm mb-4">
             <BadgeCheck size={15} /> Approved — Active Company
           </div>
-          <h1 className="text-3xl font-bold">{application.companyName}</h1>
+          <h1 className="text-3xl font-bold">{application.company_name}</h1>
           <p className="mt-2 text-green-100 text-sm max-w-2xl">
             Your company profile has been approved by the admin. Manage your drivers, vehicles, and operations from this dashboard.
           </p>
           <div className="mt-4 flex flex-wrap gap-4 text-sm text-green-200">
-            <span className="flex items-center gap-1"><Mail size={13} /> {application.companyEmail}</span>
-            <span className="flex items-center gap-1"><Phone size={13} /> {application.companyPhone}</span>
-            <span className="flex items-center gap-1"><MapPin size={13} /> {application.companyAddress || "Address not set"}</span>
+            <span className="flex items-center gap-1"><Mail size={13} /> {application.email}</span>
+            <span className="flex items-center gap-1"><Phone size={13} /> {application.phone}</span>
+            <span className="flex items-center gap-1"><MapPin size={13} /> {application.address || "Address not set"}</span>
           </div>
         </div>
 
@@ -97,26 +126,26 @@ export default function WasteCompanyDashboard() {
         {/* Owner/Manager + Company overview */}
         <div className="grid gap-5 lg:grid-cols-2">
           <Card title="Owner & Manager Information" icon={<User size={16} className="text-emerald-600" />}>
-            <InfoRow label="Owner" value={application.ownerName || "—"} />
-            <InfoRow label="Owner email" value={application.ownerEmail || "—"} />
-            <InfoRow label="Owner phone" value={application.ownerPhone || "—"} />
-            <InfoRow label="Name" value={application.managerName} />
-            <InfoRow label="Position" value={application.managerPosition || "—"} />
-            <InfoRow label="Email" value={application.managerEmail} />
-            <InfoRow label="Phone" value={application.managerPhone} />
-            <InfoRow label="National ID" value={application.managerNationalId || "—"} />
-            <InfoRow label="TIN / Reg. no." value={application.managerIdNumber || "—"} />
+            <InfoRow label="Owner" value={application.owner_name || "—"} />
+            <InfoRow label="Owner email" value={application.owner_email || "—"} />
+            <InfoRow label="Owner phone" value={application.owner_phone || "—"} />
+            <InfoRow label="Name" value={application.manager_name || "—"} />
+            <InfoRow label="Position" value={application.manager_position || "—"} />
+            <InfoRow label="Email" value={application.manager_email || "—"} />
+            <InfoRow label="Phone" value={application.manager_phone || "—"} />
+            <InfoRow label="National ID" value={application.manager_national_id || "—"} />
+            <InfoRow label="TIN / Reg. no." value={application.tin || "—"} />
           </Card>
 
           <Card title="Company Overview" icon={<Building2 size={16} className="text-green-600" />}>
-            <InfoRow label="Service areas" value={application.serviceAreas.join(", ")} />
-            <InfoRow label="Drivers" value={String(application.drivers.length)} />
-            <InfoRow label="Vehicles" value={String(application.cars?.length ?? 0)} />
-            <InfoRow label="Certificates" value={String(application.certificates.length)} />
-            <InfoRow label="Tax documents" value={String(application.taxCertificates?.length ?? 0)} />
-            {application.companyDescription && (
+            <InfoRow label="Service areas" value={mapped.serviceAreas.join(", ")} />
+            <InfoRow label="Drivers" value={String(mapped.drivers.length)} />
+            <InfoRow label="Vehicles" value={String(mapped.cars.length)} />
+            <InfoRow label="Certificates" value={String(mapped.certificates.length)} />
+            <InfoRow label="Tax documents" value={String(mapped.taxCertificates.length)} />
+            {application.description && (
               <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600 mt-1">
-                {application.companyDescription}
+                {application.description}
               </div>
             )}
           </Card>
@@ -124,11 +153,11 @@ export default function WasteCompanyDashboard() {
 
         {/* Drivers */}
         <Card title="Driver Roster" icon={<Users size={16} className="text-blue-600" />}>
-          {application.drivers.length === 0 ? (
+          {mapped.drivers.length === 0 ? (
             <p className="text-sm text-gray-400">No drivers on record.</p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
-              {application.drivers.map((driver, i) => (
+              {mapped.drivers.map((driver, i) => (
                 <div key={i} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
                   <p className="font-semibold text-gray-900">{driver.name}</p>
                   <p className="text-xs text-gray-500">{driver.email} • {driver.phone}</p>
@@ -144,11 +173,11 @@ export default function WasteCompanyDashboard() {
 
         {/* Vehicles */}
         <Card title="Fleet / Vehicles" icon={<Car size={16} className="text-purple-600" />}>
-          {!application.cars || application.cars.length === 0 ? (
+          {mapped.cars.length === 0 ? (
             <p className="text-sm text-gray-400">No vehicles on record.</p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
-              {application.cars.map((car, i) => (
+              {mapped.cars.map((car, i) => (
                 <div key={i} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
                   <p className="font-semibold text-gray-900">{car.plateNumber} — {car.model}</p>
                   <p className="text-xs text-gray-500">Year: {car.year || "N/A"} • Capacity: {car.capacity || "N/A"} tons</p>
@@ -162,9 +191,9 @@ export default function WasteCompanyDashboard() {
         {/* Documents */}
         <Card title="Certificates & Documents" icon={<ShieldCheck size={16} className="text-orange-500" />}>
           <div className="grid gap-4 md:grid-cols-3">
-            <DocList label="Business Certificates" files={application.certificates} />
-            <DocList label="RDB Certificates" files={application.rdbCertificates} />
-            <DocList label="Tax Clearance" files={application.taxCertificates ?? []} />
+            <DocList label="Business Certificates" files={mapped.certificates} />
+            <DocList label="RDB Certificates" files={mapped.rdbCertificates} />
+            <DocList label="Tax Clearance" files={mapped.taxCertificates} />
           </div>
         </Card>
       </div>
