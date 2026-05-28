@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  Truck, Users, DollarSign, AlertTriangle, TrendingUp,
+  Truck, Users, Building2, DollarSign, AlertTriangle, TrendingUp,
   BarChart3, FileText, MapPin, CreditCard, MessageSquare,
   ArrowUpRight, ArrowDownRight, Clock, ClipboardList,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ const secondaryStats = [
   { label: 'Fleet Size', value: '18 trucks', icon: <Truck size={18} className="text-green-500" />, bg: 'bg-green-50' },
   { label: 'Efficiency Rate', value: '87%', icon: <TrendingUp size={18} className="text-purple-500" />, bg: 'bg-purple-50' },
   { label: 'Zones Covered', value: '20', icon: <MapPin size={18} className="text-orange-500" />, bg: 'bg-orange-50' },
+  { label: 'Waste Companies', value: '8', icon: <Building2 size={18} className="text-emerald-600" />, bg: 'bg-emerald-50' },
 ];
 
 const activities = [
@@ -71,7 +72,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Secondary stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
         {secondaryStats.map((s) => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 flex items-center gap-3 border border-white`}>
             <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shadow-sm">{s.icon}</div>
@@ -135,7 +136,7 @@ export default function AdminDashboard() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
               <tr>
-                {['ID', 'Household', 'Zone', 'Issue', 'Priority', 'Status', 'Date'].map(h => (
+                {['ID', 'User', 'Zone', 'Issue', 'Priority', 'Status', 'Date'].map(h => (
                   <th key={h} className="px-6 py-3 text-left">{h}</th>
                 ))}
               </tr>
@@ -162,10 +163,10 @@ export default function AdminDashboard() {
         <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
           <BarChart3 size={18} className="text-purple-600" /> Quick Actions
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           {[
             { label: 'Households', icon: Users, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100', href: '/admin/households' },
-            { label: 'Waste Collectors', icon: Truck, color: 'text-green-600 bg-green-50 hover:bg-green-100', href: '/admin/waste-collectors' },
+            { label: 'Waste Companies', icon: Building2, color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100', href: '/admin/company-approvals' },
             { label: 'Applications', icon: ClipboardList, color: 'text-yellow-600 bg-yellow-50 hover:bg-yellow-100', href: '/admin/applications' },
             { label: 'Routes', icon: MapPin, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100', href: '/admin/routes' },
             { label: 'Payments', icon: CreditCard, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', href: '/admin/payments' },
