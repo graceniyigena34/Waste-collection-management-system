@@ -11,6 +11,7 @@ export interface BackendAuthUser {
   full_name: string;
   email: string;
   role: BackendRole;
+  created_at?: string;
 }
 
 export interface BackendAuthResponse {
@@ -181,6 +182,7 @@ export const api = {
 
     login: (payload: { email: string; password: string }) =>
       apiFetch<BackendAuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify(payload) }),
+    profile: () => apiFetch<BackendAuthUser>("/api/auth/profile", { method: "GET", auth: true }),
   },
 
   households: {

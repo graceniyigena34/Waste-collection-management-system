@@ -1,5 +1,6 @@
 "use client";
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { api } from '@/lib/api-client';
 import { Truck } from "lucide-react";
 
 function getStoredProfile() {
@@ -12,13 +13,13 @@ function getStoredProfile() {
     return { userName: 'User', userInitials: 'U', registrationDate: '' };
   }
 
-  try {
+    try {
     const userInfo = JSON.parse(userInfoStr) as { fullName?: string; email?: string };
     const name = userInfo.fullName || userInfo.email || 'User';
     return {
       userName: name,
       userInitials: name.substring(0, 2).toUpperCase(),
-      registrationDate: '01-05-2024',
+      registrationDate: '',
     };
   } catch {
     return { userName: 'User', userInitials: 'U', registrationDate: '' };
@@ -27,7 +28,37 @@ function getStoredProfile() {
 
 export default function Header() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const profile = useMemo(() => getStoredProfile(), []);
+  const [mounted, setMounted] = useState(false);
+  const [profile, setProfile] = useState(() => ({ userName: 'User', userInitials: 'U', registrationDate: '' }));
+  const [registrationDate, setRegistrationDate] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+
+    const p = getStoredProfile();
+    setProfile(p);
+
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null;
+    if (!token) return;
+
+    let alive = true;
+    api.auth.profile()
+      .then((user) => {
+        if (!alive) return;
+        if (user && user.created_at) {
+          const d = new Date(user.created_at);
+          const formatted = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+          setRegistrationDate(formatted);
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
   return (
     <div className="bg-gradient-to-r from-green-900 to-green-700 text-white p-6 flex items-center justify-between">
       <div className="flex flex-col">
@@ -43,8 +74,12 @@ export default function Header() {
 
       <div className="flex items-center gap-4">
         <div className="text-right hidden sm:block">
-          <p className="font-semibold">{profile.userName}</p>
-          <p className="text-sm text-teal-100">Registered: {profile.registrationDate}</p>
+          {mounted ? (
+            <>
+              <p className="font-semibold">{profile.userName}</p>
+              <p className="text-sm text-teal-100">Registered: {registrationDate || '—'}</p>
+            </>
+          ) : null}
         </div>
         <div className="flex items-center gap-3 relative">
           <button
