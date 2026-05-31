@@ -99,7 +99,7 @@ export default function CompanyOnboardingPage() {
         setCompanyId(company.id);
         setProfile((current) => ({ ...current, ...mapBackendToProfile(company) }));
         if (company.status === "approved") {
-          router.push("/wasteCompanyDashboard");
+          router.replace("/wasteCompanyDashboard");
         }
       } catch {
         // No existing company profile yet.

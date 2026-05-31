@@ -20,26 +20,39 @@ export default function CompanyStatusPage() {
       return;
     }
 
+    let isMounted = true;
+    let redirectTimer: ReturnType<typeof setTimeout> | undefined;
+
     const loadCompany = async () => {
       if (!userInfo.email) {
-        setLoading(false);
+        if (isMounted) setLoading(false);
         return;
       }
 
       try {
         const res = await api.companies.byEmail(userInfo.email);
+        if (!isMounted) return;
+
         setCompany(res.company);
-        if (res.company.status === "approved") {
-          router.push("/wasteCompanyDashboard");
-        }
       } catch {
-        setCompany(null);
+        if (isMounted) setCompany(null);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     void loadCompany();
+
+    redirectTimer = setInterval(() => {
+      void loadCompany();
+    }, 10000);
+
+    return () => {
+      isMounted = false;
+      if (redirectTimer) {
+        clearInterval(redirectTimer);
+      }
+    };
   }, [router, userInfo]);
 
   if (loading || !userInfo || !isWasteCollectorRole(userInfo.role)) {
@@ -122,9 +135,14 @@ export default function CompanyStatusPage() {
                   : 'Stay on this page until the admin reviews your application.'}
             </p>
             {status === 'approved' && (
-              <button onClick={() => router.push("/wasteCompanyDashboard")} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-800">
-                Go to dashboard <ArrowRight size={16} />
-              </button>
+              <div className="mt-4 space-y-3">
+                <button onClick={() => router.replace("/wasteCompanyDashboard")} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-green-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-800">
+                  Next <ArrowRight size={16} />
+                </button>
+                <p className="text-xs text-gray-500">
+                  This will take you to the place where your company manages all activities.
+                </p>
+              </div>
             )}
           </div>
         </div>

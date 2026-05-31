@@ -210,7 +210,7 @@ export default function Signup() {
                   className={`${inputClass} px-4 appearance-none bg-white`}
                 >
                   <option value="citizen">Citizen</option>
-                  <option value="collector">Waste Collector</option>
+                  <option value="collector">Waste Company</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>
