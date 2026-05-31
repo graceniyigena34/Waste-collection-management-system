@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, Eye, X, CheckCircle, XCircle, Clock, Building2, Phone, Mail, MapPin, FileText, AlertCircle } from 'lucide-react';
+import { api, type BackendCompanyProfile } from '@/lib/api-client';
 
 type AppStatus = 'Pending' | 'Approved' | 'Rejected';
 
 interface Application {
-  id: string;
+  id: number;
   companyName: string;
   contactPerson: string;
   email: string;
@@ -19,73 +21,9 @@ interface Application {
   description: string;
   status: AppStatus;
   appliedDate: string;
+  reviewedAt?: string;
   reviewNote?: string;
 }
-
-const initialApplications: Application[] = [
-  {
-    id: 'APP-001',
-    companyName: 'EcoClean Rwanda Ltd',
-    contactPerson: 'Mugisha Emmanuel',
-    email: 'info@ecoclean.rw',
-    phone: '+250 788 200 001',
-    address: 'KG 45 St, Kicukiro',
-    zone: 'Kicukiro',
-    fleetSize: 5,
-    licenseNo: 'RDB-2024-001',
-    experience: '3 years',
-    description: 'We are a registered waste collection company with 3 years of experience serving Kicukiro district.',
-    status: 'Pending',
-    appliedDate: 'Jan 10, 2025',
-  },
-  {
-    id: 'APP-002',
-    companyName: 'GreenWaste Solutions',
-    contactPerson: 'Uwimana Solange',
-    email: 'contact@greenwaste.rw',
-    phone: '+250 788 200 002',
-    address: 'KN 12 Ave, Gasabo',
-    zone: 'Gasabo',
-    fleetSize: 8,
-    licenseNo: 'RDB-2024-002',
-    experience: '5 years',
-    description: 'Specialized in organic and recyclable waste collection across Gasabo district with certified staff.',
-    status: 'Pending',
-    appliedDate: 'Jan 12, 2025',
-  },
-  {
-    id: 'APP-003',
-    companyName: 'CleanCity Corp',
-    contactPerson: 'Habimana Patrick',
-    email: 'hello@cleancity.rw',
-    phone: '+250 788 200 003',
-    address: 'KK 8 Rd, Nyarugenge',
-    zone: 'Nyarugenge',
-    fleetSize: 3,
-    licenseNo: 'RDB-2023-015',
-    experience: '2 years',
-    description: 'Small but efficient waste collection company focused on Nyarugenge sector.',
-    status: 'Approved',
-    appliedDate: 'Dec 5, 2024',
-    reviewNote: 'All documents verified. License valid.',
-  },
-  {
-    id: 'APP-004',
-    companyName: 'WasteAway Ltd',
-    contactPerson: 'Niyonzima Jules',
-    email: 'wasteaway@gmail.com',
-    phone: '+250 788 200 004',
-    address: 'KG 99 St, Remera',
-    zone: 'Remera',
-    fleetSize: 2,
-    licenseNo: 'INVALID-000',
-    experience: '6 months',
-    description: 'New company looking to expand into waste collection services.',
-    status: 'Rejected',
-    appliedDate: 'Dec 20, 2024',
-    reviewNote: 'License number invalid. Insufficient experience.',
-  },
-];
 
 const statusStyle: Record<AppStatus, string> = {
   Pending: 'bg-yellow-100 text-yellow-700',
@@ -100,12 +38,41 @@ const statusIcon: Record<AppStatus, React.ReactNode> = {
 };
 
 export default function ApplicationsPage() {
-  const [applications, setApplications] = useState<Application[]>(initialApplications);
+  const router = useRouter();
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'All' | AppStatus>('All');
   const [selected, setSelected] = useState<Application | null>(null);
   const [reviewNote, setReviewNote] = useState('');
   const [modal, setModal] = useState<'view' | 'review' | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    const userInfo = localStorage.getItem('user_info');
+    if (!token || !userInfo) {
+      router.push('/signin');
+      return;
+    }
+
+    const load = async () => {
+      try {
+        const response = await api.companies.all(500, 0);
+        setApplications(response.data.map(mapCompanyToApplication));
+      } catch {
+        setApplications([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void load();
+  }, [router]);
+
+  const reload = async () => {
+    const response = await api.companies.all(500, 0);
+    setApplications(response.data.map(mapCompanyToApplication));
+  };
 
   const filtered = applications.filter(a =>
     (filterStatus === 'All' || a.status === filterStatus) &&
@@ -119,11 +86,14 @@ export default function ApplicationsPage() {
 
   const handleDecision = (decision: 'Approved' | 'Rejected') => {
     if (!selected) return;
-    setApplications(prev => prev.map(a =>
-      a.id === selected.id ? { ...a, status: decision, reviewNote } : a
-    ));
-    setModal(null);
-    setReviewNote('');
+    const action = decision === 'Approved'
+      ? api.companies.approveWithNotes(selected.id, reviewNote)
+      : api.companies.reject(selected.id, reviewNote);
+
+    void action.then(() => reload()).finally(() => {
+      setModal(null);
+      setReviewNote('');
+    });
   };
 
   const stats = [
@@ -135,100 +105,108 @@ export default function ApplicationsPage() {
 
   return (
     <div className="space-y-6">
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map(s => (
-          <div key={s.label} className={`${s.bg} rounded-xl p-4 flex items-center gap-3`}>
-            <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shadow-sm">{s.icon}</div>
-            <div>
-              <p className="text-xs text-gray-500">{s.label}</p>
-              <p className="font-bold text-gray-800 text-lg">{s.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Toolbar */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap gap-3 items-center">
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search companies..."
-            className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-60"
-          />
+      {loading ? (
+        <div className="min-h-[50vh] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600" />
         </div>
-        {(['All', 'Pending', 'Approved', 'Rejected'] as const).map(s => (
-          <button
-            key={s}
-            onClick={() => setFilterStatus(s)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${filterStatus === s ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      ) : (
+        <>
 
-      {/* Applications list */}
-      <div className="space-y-3">
-        {filtered.map(a => (
-          <div key={a.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-4 flex-1">
-                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Building2 size={22} className="text-green-700" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="font-bold text-gray-800">{a.companyName}</p>
-                    <span className="font-mono text-xs text-gray-400">{a.id}</span>
-                    <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusStyle[a.status]}`}>
-                      {statusIcon[a.status]} {a.status}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                    <span className="flex items-center gap-1"><MapPin size={12} />{a.zone}</span>
-                    <span className="flex items-center gap-1"><Phone size={12} />{a.phone}</span>
-                    <span className="flex items-center gap-1"><Mail size={12} />{a.email}</span>
-                    <span>Fleet: {a.fleetSize} trucks</span>
-                    <span>Experience: {a.experience}</span>
-                    <span>Applied: {a.appliedDate}</span>
-                  </div>
-                  {a.reviewNote && (
-                    <p className="text-xs text-gray-500 mt-1.5 italic">Note: {a.reviewNote}</p>
-                  )}
+          {/* Stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {stats.map(s => (
+              <div key={s.label} className={`${s.bg} rounded-xl p-4 flex items-center gap-3`}>
+                <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shadow-sm">{s.icon}</div>
+                <div>
+                  <p className="text-xs text-gray-500">{s.label}</p>
+                  <p className="font-bold text-gray-800 text-lg">{s.value}</p>
                 </div>
               </div>
+            ))}
+          </div>
 
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                <button
-                  onClick={() => openView(a)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-50 transition"
-                >
-                  <Eye size={13} /> View
-                </button>
-                {a.status === 'Pending' && (
-                  <button
-                    onClick={() => openReview(a)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-green-700 border border-green-200 rounded-lg text-xs font-medium hover:bg-green-50 transition"
-                  >
-                    <AlertCircle size={13} /> Review
-                  </button>
-                )}
-              </div>
+          {/* Toolbar */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap gap-3 items-center">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search companies..."
+                className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-60"
+              />
             </div>
+            {(['All', 'Pending', 'Approved', 'Rejected'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition ${filterStatus === s ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                {s}
+              </button>
+            ))}
           </div>
-        ))}
 
-        {filtered.length === 0 && (
-          <div className="bg-white rounded-2xl p-12 text-center text-gray-400 shadow-sm border border-gray-100">
-            <Building2 size={40} className="mx-auto mb-3 opacity-30" />
-            <p>No applications found.</p>
+          {/* Applications list */}
+          <div className="space-y-3">
+            {filtered.map(a => (
+              <div key={a.id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-4 flex-1">
+                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Building2 size={22} className="text-green-700" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <p className="font-bold text-gray-800">{a.companyName}</p>
+                        <span className="font-mono text-xs text-gray-400">{a.id}</span>
+                        <span className={`flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusStyle[a.status]}`}>
+                          {statusIcon[a.status]} {a.status}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                        <span className="flex items-center gap-1"><MapPin size={12} />{a.zone}</span>
+                        <span className="flex items-center gap-1"><Phone size={12} />{a.phone}</span>
+                        <span className="flex items-center gap-1"><Mail size={12} />{a.email}</span>
+                        <span>Fleet: {a.fleetSize} trucks</span>
+                        <span>Experience: {a.experience}</span>
+                        <span>Applied: {a.appliedDate}</span>
+                      </div>
+                      {a.reviewNote && (
+                        <p className="text-xs text-gray-500 mt-1.5 italic">Note: {a.reviewNote}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 flex-shrink-0">
+                  <button
+                      onClick={() => openView(a)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-50 transition"
+                  >
+                      <Eye size={13} /> View
+                  </button>
+                    {a.status === 'Pending' && (
+                      <button
+                        onClick={() => openReview(a)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-green-700 border border-green-200 rounded-lg text-xs font-medium hover:bg-green-50 transition"
+                      >
+                        <AlertCircle size={13} /> Review
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {filtered.length === 0 && (
+              <div className="bg-white rounded-2xl p-12 text-center text-gray-400 shadow-sm border border-gray-100">
+                <Building2 size={40} className="mx-auto mb-3 opacity-30" />
+                <p>No applications found.</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* View Modal */}
       {modal === 'view' && selected && (
@@ -353,4 +331,27 @@ export default function ApplicationsPage() {
       )}
     </div>
   );
+}
+
+function mapCompanyToApplication(company: BackendCompanyProfile): Application {
+  const serviceAreas = Array.isArray(company.service_areas) ? company.service_areas.join(', ') : '';
+  const vehicles = Array.isArray(company.vehicles) ? company.vehicles.length : 0;
+
+  return {
+    id: company.id,
+    companyName: company.company_name,
+    contactPerson: company.manager_name || company.owner_name || company.company_name,
+    email: company.email,
+    phone: company.phone,
+    address: company.address || '—',
+    zone: company.district || serviceAreas || '—',
+    fleetSize: vehicles,
+    licenseNo: company.tin || '—',
+    experience: company.years_of_experience ? `${company.years_of_experience} years` : '—',
+    description: company.description || 'No description provided.',
+    status: company.status === 'approved' ? 'Approved' : company.status === 'rejected' ? 'Rejected' : 'Pending',
+    appliedDate: company.created_at ? new Date(company.created_at).toLocaleDateString() : '—',
+    reviewNote: company.review_notes || undefined,
+    reviewedAt: company.reviewed_at || undefined,
+  };
 }

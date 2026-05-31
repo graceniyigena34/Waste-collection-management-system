@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   BadgeCheck, Ban, Building2, Car, CheckCircle2,
@@ -14,6 +14,31 @@ export default function CompanyApprovalsPage() {
   const [loading, setLoading] = useState(true);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null);
+  const [newCompany, setNewCompany] = useState({
+    company_name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirm_password: "",
+    owner_name: "",
+    owner_email: "",
+    owner_phone: "",
+    tin: "",
+    address: "",
+    description: "",
+    district: "",
+    sector: "",
+    cell: "",
+    village: "",
+    manager_name: "",
+    manager_email: "",
+    manager_phone: "",
+    manager_position: "",
+    manager_national_id: "",
+  });
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -37,6 +62,67 @@ export default function CompanyApprovalsPage() {
   const reloadApplications = async () => {
     const response = await api.companies.all(500, 0);
     setApplications(response.data);
+  };
+
+  const handleCreateCompany = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCreateError("");
+    setCreatedCredentials(null);
+    setCreating(true);
+
+    try {
+      const response = await api.companies.createWithAccess({
+        company_name: newCompany.company_name.trim(),
+        email: newCompany.email.trim(),
+        phone: newCompany.phone.trim(),
+        password: newCompany.password,
+        confirm_password: newCompany.confirm_password,
+        owner_name: newCompany.owner_name.trim() || undefined,
+        owner_email: newCompany.owner_email.trim() || undefined,
+        owner_phone: newCompany.owner_phone.trim() || undefined,
+        tin: newCompany.tin.trim() || undefined,
+        address: newCompany.address.trim() || undefined,
+        description: newCompany.description.trim() || undefined,
+        district: newCompany.district.trim() || undefined,
+        sector: newCompany.sector.trim() || undefined,
+        cell: newCompany.cell.trim() || undefined,
+        village: newCompany.village.trim() || undefined,
+        manager_name: newCompany.manager_name.trim() || undefined,
+        manager_email: newCompany.manager_email.trim() || undefined,
+        manager_phone: newCompany.manager_phone.trim() || undefined,
+        manager_position: newCompany.manager_position.trim() || undefined,
+        manager_national_id: newCompany.manager_national_id.trim() || undefined,
+      });
+
+      setCreatedCredentials(response.credentials);
+      setNewCompany({
+        company_name: "",
+        email: "",
+        phone: "",
+        password: "",
+        confirm_password: "",
+        owner_name: "",
+        owner_email: "",
+        owner_phone: "",
+        tin: "",
+        address: "",
+        description: "",
+        district: "",
+        sector: "",
+        cell: "",
+        village: "",
+        manager_name: "",
+        manager_email: "",
+        manager_phone: "",
+        manager_position: "",
+        manager_national_id: "",
+      });
+      await reloadApplications();
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Failed to create company account.");
+    } finally {
+      setCreating(false);
+    }
   };
 
   const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
@@ -65,7 +151,89 @@ export default function CompanyApprovalsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
+        <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Create Company Access</h1>
+            <p className="text-sm text-gray-500 mt-1">Create the company login, then review and approve the profile.</p>
+          </div>
+          <div className="flex gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">
+              <BadgeCheck size={15} /> {pending} pending
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-sm font-semibold text-gray-600">
+              {applications.length} total
+            </span>
+          </div>
+        </div>
+
+        <form onSubmit={handleCreateCompany} className="space-y-4">
+          {createError && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{createError}</div>
+          )}
+          {createdCredentials && (
+            <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              <p className="font-semibold mb-1">Company account created successfully</p>
+              <p>Username: {createdCredentials.username}</p>
+              <p>Password: {createdCredentials.password}</p>
+            </div>
+          )}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input label="Company name" value={newCompany.company_name} onChange={(value) => setNewCompany((prev) => ({ ...prev, company_name: value }))} required />
+            <Input label="Company email (username)" value={newCompany.email} onChange={(value) => setNewCompany((prev) => ({ ...prev, email: value }))} required />
+            <Input label="Company phone" value={newCompany.phone} onChange={(value) => setNewCompany((prev) => ({ ...prev, phone: value }))} required />
+            <Input label="TIN / Registration number" value={newCompany.tin} onChange={(value) => setNewCompany((prev) => ({ ...prev, tin: value }))} />
+            <Input label="Login password" type="password" value={newCompany.password} onChange={(value) => setNewCompany((prev) => ({ ...prev, password: value }))} required />
+            <Input label="Confirm password" type="password" value={newCompany.confirm_password} onChange={(value) => setNewCompany((prev) => ({ ...prev, confirm_password: value }))} required />
+            <Input label="Owner name" value={newCompany.owner_name} onChange={(value) => setNewCompany((prev) => ({ ...prev, owner_name: value }))} />
+            <Input label="Owner email" value={newCompany.owner_email} onChange={(value) => setNewCompany((prev) => ({ ...prev, owner_email: value }))} />
+            <Input label="Owner phone" value={newCompany.owner_phone} onChange={(value) => setNewCompany((prev) => ({ ...prev, owner_phone: value }))} />
+            <Input label="Manager name" value={newCompany.manager_name} onChange={(value) => setNewCompany((prev) => ({ ...prev, manager_name: value }))} />
+            <Input label="Manager email" value={newCompany.manager_email} onChange={(value) => setNewCompany((prev) => ({ ...prev, manager_email: value }))} />
+            <Input label="Manager phone" value={newCompany.manager_phone} onChange={(value) => setNewCompany((prev) => ({ ...prev, manager_phone: value }))} />
+            <Input label="Manager position" value={newCompany.manager_position} onChange={(value) => setNewCompany((prev) => ({ ...prev, manager_position: value }))} />
+            <Input label="Manager national ID" value={newCompany.manager_national_id} onChange={(value) => setNewCompany((prev) => ({ ...prev, manager_national_id: value }))} />
+            <Input label="District" value={newCompany.district} onChange={(value) => setNewCompany((prev) => ({ ...prev, district: value }))} />
+            <Input label="Sector" value={newCompany.sector} onChange={(value) => setNewCompany((prev) => ({ ...prev, sector: value }))} />
+            <Input label="Cell" value={newCompany.cell} onChange={(value) => setNewCompany((prev) => ({ ...prev, cell: value }))} />
+            <Input label="Village" value={newCompany.village} onChange={(value) => setNewCompany((prev) => ({ ...prev, village: value }))} />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">Address</label>
+            <textarea
+              value={newCompany.address}
+              onChange={(event) => setNewCompany((prev) => ({ ...prev, address: event.target.value }))}
+              rows={2}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="Company location"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">Description</label>
+            <textarea
+              value={newCompany.description}
+              onChange={(event) => setNewCompany((prev) => ({ ...prev, description: event.target.value }))}
+              rows={3}
+              className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              placeholder="What services does this company provide?"
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              disabled={creating}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {creating ? "Creating..." : "Create Company Access"}
+            </button>
+          </div>
+        </form>
+      </div>
+
       <div className="rounded-3xl bg-white p-6 shadow-sm border border-gray-100">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
@@ -290,5 +458,35 @@ function DocList({ label, files }: { label: string; files: string[] }) {
         </ul>
       )}
     </div>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  required?: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-medium text-gray-700">
+        {label}
+        {required ? " *" : ""}
+      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+      />
+    </label>
   );
 }

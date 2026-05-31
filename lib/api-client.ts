@@ -20,6 +20,16 @@ export interface BackendAuthResponse {
   user: BackendAuthUser;
 }
 
+export interface CompanyAccessResponse {
+  message: string;
+  credentials: {
+    username: string;
+    password: string;
+  };
+  user: BackendAuthUser;
+  company: BackendCompanyProfile;
+}
+
 export interface FrontendUserInfo {
   fullName?: string;
   email?: string;
@@ -200,6 +210,46 @@ export const api = {
   },
 
   companies: {
+    createWithAccess: (payload: {
+      company_name: string;
+      email: string;
+      phone: string;
+      password: string;
+      confirm_password: string;
+      owner_name?: string;
+      owner_email?: string;
+      owner_phone?: string;
+      tin?: string;
+      address?: string;
+      description?: string;
+      district?: string;
+      sector?: string;
+      cell?: string;
+      village?: string;
+      company_logo?: string;
+      company_images?: unknown[];
+      company_type?: string;
+      years_of_experience?: number;
+      number_of_employees?: number;
+      manager_name?: string;
+      manager_email?: string;
+      manager_phone?: string;
+      manager_position?: string;
+      manager_national_id?: string;
+      drivers?: unknown[];
+      vehicles?: unknown[];
+      certificates?: unknown[];
+      rdb_certificates?: unknown[];
+      tax_certificates?: unknown[];
+      service_areas?: unknown[];
+      notes?: string;
+    }) =>
+      apiFetch<CompanyAccessResponse>("/api/companies/admin-create", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
     create: (payload: {
       company_name: string;
       email: string;
