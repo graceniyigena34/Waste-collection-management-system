@@ -58,6 +58,7 @@ export default function WasteCompanyDashboard() {
   const [districtSaving, setDistrictSaving] = useState(false);
   const [districtMessage, setDistrictMessage] = useState("");
   const [scheduleMessage, setScheduleMessage] = useState("");
+  const [scheduleSaving, setScheduleSaving] = useState(false);
 
   const [scheduleTasks, setScheduleTasks] = useState<ScheduleTask[]>([]);
   const [scheduleModal, setScheduleModal] = useState(false);
@@ -154,6 +155,124 @@ export default function WasteCompanyDashboard() {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user_info");
     router.push("/signin");
+  };
+
+  const mapTaskToPayload = (task: ScheduleTask) => ({
+    district_id: task.districtId,
+    district_name: task.districtName,
+    schedule_date: task.scheduleDate,
+    day: task.day,
+    sector_id: task.sectorId,
+    sector_name: task.sectorName,
+    cells: task.cells,
+    driver: task.driver,
+    vehicle: task.vehicle,
+    start_time: task.startTime,
+    waste_type: task.wasteType,
+    status: task.status,
+    notes: task.notes,
+  });
+
+  const handleSaveScheduleTask = async () => {
+    if (!application || !companyDistrict || !scheduleForm.sectorId || scheduleForm.cells.length === 0) {
+      setScheduleMessage("Please select a sector and at least one cell.");
+      return;
+    }
+
+    const sector = districtSectors.find((item) => item.id === scheduleForm.sectorId || item.name === scheduleForm.sectorId);
+    if (!sector) return;
+
+    setScheduleMessage("");
+    setScheduleSaving(true);
+
+    const nextTask: ScheduleTask = {
+      id: editTask?.id ?? 0,
+      districtId: companyDistrict.id,
+      districtName: companyDistrict.name,
+      scheduleDate: scheduleForm.scheduleDate,
+      day: scheduleForm.day,
+      sectorId: sector.id,
+      sectorName: sector.name,
+      cells: scheduleForm.cells,
+      driver: scheduleForm.driver,
+      vehicle: scheduleForm.vehicle,
+      startTime: scheduleForm.startTime,
+      wasteType: scheduleForm.wasteType,
+      status: editTask?.status ?? "Scheduled",
+      notes: scheduleForm.notes.trim(),
+    };
+
+    try {
+      if (editTask) {
+        const updated = await api.companySchedules.update(application.id, editTask.id, mapTaskToPayload(nextTask));
+        const saved: ScheduleTask = {
+          id: updated.schedule.id,
+          districtId: updated.schedule.district_id || nextTask.districtId,
+          districtName: updated.schedule.district_name || nextTask.districtName,
+          scheduleDate: updated.schedule.schedule_date || nextTask.scheduleDate,
+          day: (updated.schedule.day as Day) || nextTask.day,
+          sectorId: updated.schedule.sector_id || nextTask.sectorId,
+          sectorName: updated.schedule.sector_name || nextTask.sectorName,
+          cells: updated.schedule.cells || nextTask.cells,
+          driver: updated.schedule.driver || nextTask.driver,
+          vehicle: updated.schedule.vehicle || nextTask.vehicle,
+          startTime: updated.schedule.start_time || nextTask.startTime,
+          wasteType: (updated.schedule.waste_type as WasteType) || nextTask.wasteType,
+          status: (updated.schedule.status as TaskStatus) || nextTask.status,
+          notes: updated.schedule.notes || nextTask.notes,
+        };
+        setScheduleTasks((current) => current.map((entry) => (entry.id === editTask.id ? saved : entry)));
+      } else {
+        const created = await api.companySchedules.create(application.id, mapTaskToPayload(nextTask));
+        const saved: ScheduleTask = {
+          id: created.schedule.id,
+          districtId: created.schedule.district_id || nextTask.districtId,
+          districtName: created.schedule.district_name || nextTask.districtName,
+          scheduleDate: created.schedule.schedule_date || nextTask.scheduleDate,
+          day: (created.schedule.day as Day) || nextTask.day,
+          sectorId: created.schedule.sector_id || nextTask.sectorId,
+          sectorName: created.schedule.sector_name || nextTask.sectorName,
+          cells: created.schedule.cells || nextTask.cells,
+          driver: created.schedule.driver || nextTask.driver,
+          vehicle: created.schedule.vehicle || nextTask.vehicle,
+          startTime: created.schedule.start_time || nextTask.startTime,
+          wasteType: (created.schedule.waste_type as WasteType) || nextTask.wasteType,
+          status: (created.schedule.status as TaskStatus) || nextTask.status,
+          notes: created.schedule.notes || nextTask.notes,
+        };
+        setScheduleTasks((current) => [saved, ...current]);
+      }
+      setScheduleMessage("Weekly task saved to the database.");
+      closeScheduleModal();
+    } catch (error) {
+      setScheduleMessage(error instanceof Error ? error.message : "Failed to save weekly task.");
+    } finally {
+      setScheduleSaving(false);
+    }
+  };
+
+  const handleDeleteScheduleTask = async (taskId: number) => {
+    if (!application) return;
+    try {
+      await api.companySchedules.remove(application.id, taskId);
+      setScheduleTasks((current) => current.filter((task) => task.id !== taskId));
+      setScheduleMessage("Weekly task deleted.");
+    } catch (error) {
+      setScheduleMessage(error instanceof Error ? error.message : "Failed to delete weekly task.");
+    }
+  };
+
+  const handleStatusChange = async (taskId: number, status: TaskStatus) => {
+    if (!application) return;
+    const task = scheduleTasks.find((entry) => entry.id === taskId);
+    if (!task) return;
+    setScheduleTasks((current) => current.map((entry) => (entry.id === taskId ? { ...entry, status } : entry)));
+    try {
+      await api.companySchedules.update(application.id, taskId, { ...mapTaskToPayload(task), status });
+    } catch (error) {
+      setScheduleTasks((current) => current.map((entry) => (entry.id === taskId ? task : entry)));
+      setScheduleMessage(error instanceof Error ? error.message : "Failed to update task status.");
+    }
   };
 
   const handleDistrictSave = async () => {
@@ -254,6 +373,7 @@ export default function WasteCompanyDashboard() {
   };
 
   const openScheduleModal = (task?: ScheduleTask) => {
+    setScheduleMessage("");
     if (task) {
       setEditTask(task);
       setScheduleForm({
@@ -310,125 +430,6 @@ export default function WasteCompanyDashboard() {
     setAssignmentDriver("");
     setAssignmentVehicle("");
     setAssignmentZone("");
-  };
-
-  const mapTaskToPayload = (task: ScheduleTask) => ({
-    district_id: task.districtId,
-    district_name: task.districtName,
-    schedule_date: task.scheduleDate,
-    day: task.day,
-    sector_id: task.sectorId,
-    sector_name: task.sectorName,
-    cells: task.cells,
-    driver: task.driver,
-    vehicle: task.vehicle,
-    start_time: task.startTime,
-    waste_type: task.wasteType,
-    status: task.status,
-    notes: task.notes,
-  });
-
-  const handleSaveScheduleTask = async () => {
-    if (!application || !companyDistrict || !scheduleForm.sectorId || scheduleForm.cells.length === 0) {
-      return;
-    }
-
-    const sector = districtSectors.find((item) => item.id === scheduleForm.sectorId || item.name === scheduleForm.sectorId);
-    if (!sector) return;
-
-    setScheduleMessage("");
-
-    const nextTask: ScheduleTask = {
-      id: editTask?.id ?? Date.now(),
-      districtId: companyDistrict.id,
-      districtName: companyDistrict.name,
-      scheduleDate: scheduleForm.scheduleDate,
-      day: scheduleForm.day,
-      sectorId: sector.id,
-      sectorName: sector.name,
-      cells: scheduleForm.cells,
-      driver: scheduleForm.driver,
-      vehicle: scheduleForm.vehicle,
-      startTime: scheduleForm.startTime,
-      wasteType: scheduleForm.wasteType,
-      status: editTask?.status ?? "Scheduled",
-      notes: scheduleForm.notes.trim(),
-    };
-
-    try {
-      if (editTask) {
-        const updated = await api.companySchedules.update(application.id, editTask.id, mapTaskToPayload(nextTask));
-        const savedTask: ScheduleTask = {
-          id: updated.schedule.id,
-          districtId: updated.schedule.district_id || nextTask.districtId,
-          districtName: updated.schedule.district_name || nextTask.districtName,
-          scheduleDate: updated.schedule.schedule_date || nextTask.scheduleDate,
-          day: updated.schedule.day as Day,
-          sectorId: updated.schedule.sector_id || nextTask.sectorId,
-          sectorName: updated.schedule.sector_name || nextTask.sectorName,
-          cells: updated.schedule.cells || nextTask.cells,
-          driver: updated.schedule.driver || nextTask.driver,
-          vehicle: updated.schedule.vehicle || nextTask.vehicle,
-          startTime: updated.schedule.start_time || nextTask.startTime,
-          wasteType: (updated.schedule.waste_type as WasteType) || nextTask.wasteType,
-          status: (updated.schedule.status as TaskStatus) || nextTask.status,
-          notes: updated.schedule.notes || nextTask.notes,
-        };
-
-        setScheduleTasks((current) => current.map((entry) => (entry.id === editTask.id ? savedTask : entry)));
-      } else {
-        const created = await api.companySchedules.create(application.id, mapTaskToPayload(nextTask));
-        const savedTask: ScheduleTask = {
-          id: created.schedule.id,
-          districtId: created.schedule.district_id || nextTask.districtId,
-          districtName: created.schedule.district_name || nextTask.districtName,
-          scheduleDate: created.schedule.schedule_date || nextTask.scheduleDate,
-          day: created.schedule.day as Day,
-          sectorId: created.schedule.sector_id || nextTask.sectorId,
-          sectorName: created.schedule.sector_name || nextTask.sectorName,
-          cells: created.schedule.cells || nextTask.cells,
-          driver: created.schedule.driver || nextTask.driver,
-          vehicle: created.schedule.vehicle || nextTask.vehicle,
-          startTime: created.schedule.start_time || nextTask.startTime,
-          wasteType: (created.schedule.waste_type as WasteType) || nextTask.wasteType,
-          status: (created.schedule.status as TaskStatus) || nextTask.status,
-          notes: created.schedule.notes || nextTask.notes,
-        };
-
-        setScheduleTasks((current) => [savedTask, ...current]);
-      }
-
-      setScheduleMessage("Weekly task saved to the database.");
-      closeScheduleModal();
-    } catch (error) {
-      setScheduleMessage(error instanceof Error ? error.message : "Failed to save weekly task.");
-    }
-  };
-
-  const handleDeleteScheduleTask = async (taskId: number) => {
-    if (!application) return;
-    try {
-      await api.companySchedules.remove(application.id, taskId);
-      setScheduleTasks((current) => current.filter((task) => task.id !== taskId));
-      setScheduleMessage("Weekly task deleted.");
-    } catch (error) {
-      setScheduleMessage(error instanceof Error ? error.message : "Failed to delete weekly task.");
-    }
-  };
-
-  const handleStatusChange = async (taskId: number, status: TaskStatus) => {
-    if (!application) return;
-    const task = scheduleTasks.find((entry) => entry.id === taskId);
-    if (!task) return;
-
-    setScheduleTasks((current) => current.map((entry) => (entry.id === taskId ? { ...entry, status } : entry)));
-
-    try {
-      await api.companySchedules.update(application.id, taskId, { ...mapTaskToPayload(task), status });
-    } catch (error) {
-      setScheduleTasks((current) => current.map((entry) => (entry.id === taskId ? task : entry)));
-      setScheduleMessage(error instanceof Error ? error.message : "Failed to update task status.");
-    }
   };
 
   return (
@@ -1070,15 +1071,33 @@ export default function WasteCompanyDashboard() {
                 </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
-                  <button onClick={closeScheduleModal} className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
-                    Cancel
-                  </button>
-                  <button onClick={handleSaveScheduleTask} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition">
-                    <CheckCircle2 size={15} /> {editTask ? "Update task" : "Save task"}
-                  </button>
+                <div className="border-t border-gray-100 px-6 py-4 space-y-3">
+                  {scheduleMessage && (
+                    <p className={`text-sm font-medium ${scheduleMessage.toLowerCase().includes("fail") || scheduleMessage.toLowerCase().includes("error") || scheduleMessage.toLowerCase().includes("select") ? "text-red-600" : "text-green-700"}`}>
+                      {scheduleMessage}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <button onClick={closeScheduleModal} disabled={scheduleSaving} className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition disabled:opacity-50">
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveScheduleTask}
+                      disabled={scheduleSaving}
+                      className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {scheduleSaving ? (
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                        </svg>
+                      ) : (
+                        <CheckCircle2 size={15} />
+                      )}
+                      {scheduleSaving ? "Saving..." : editTask ? "Update task" : "Save task"}
+                    </button>
+                  </div>
                 </div>
-                {scheduleMessage && <div className="px-6 pb-4 text-sm text-gray-600">{scheduleMessage}</div>}
               </div>
             </div>
           )}
