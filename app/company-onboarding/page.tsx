@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight, Building2, Car, FileImage, FileText,
+  ArrowRight, Building2, Car, FileText,
   MapPin, Plus, ShieldCheck, Trash2, Truck, User2, LogOut,
 } from "lucide-react";
 import {
@@ -26,7 +26,7 @@ const emptyCar: CompanyCarInput = {
 const emptyProfile: CompanyApplicationProfile = {
   companyName: "", companyEmail: "", companyPhone: "", companyAddress: "",
   ownerName: "", ownerEmail: "", ownerPhone: "",
-  companyDescription: "", companyLogo: "", companyImages: [],
+  companyDescription: "", district: "", companyLogo: "", companyImages: [],
   certificates: [], rdbCertificates: [], taxCertificates: [],
   managerName: "", managerEmail: "", managerPhone: "",
   managerPosition: "", managerIdNumber: "", managerNationalId: "",
@@ -53,6 +53,7 @@ export default function CompanyOnboardingPage() {
     cars: [],
     taxCertificates: [],
     managerNationalId: "",
+    district: "",
   }));
 
   const mapBackendToProfile = (company: BackendCompanyProfile): CompanyApplicationProfile => ({
@@ -64,6 +65,7 @@ export default function CompanyOnboardingPage() {
     ownerPhone: company.owner_phone || "",
     companyAddress: company.address || "",
     companyDescription: company.description || "",
+    district: company.district || "",
     companyLogo: company.company_logo || "",
     companyImages: Array.isArray(company.company_images) ? (company.company_images as string[]) : [],
     certificates: Array.isArray(company.certificates) ? (company.certificates as string[]) : [],
@@ -190,6 +192,7 @@ export default function CompanyOnboardingPage() {
         tin: profile.managerIdNumber,
         address: profile.companyAddress,
         description: profile.companyDescription,
+        district: profile.district || undefined,
         company_logo: profile.companyLogo,
         company_images: profile.companyImages,
         manager_name: profile.managerName,

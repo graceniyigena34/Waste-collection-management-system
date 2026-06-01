@@ -1,15 +1,49 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2, BadgeCheck, Users, FileText, MapPin,
   Car, ShieldCheck, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
-  Clock, AlertTriangle, DollarSign, TrendingUp, Bell, Plus,
+  Clock, AlertTriangle, Bell, Plus,
+  CalendarDays, CheckCircle2, Edit3, Trash2, X,
 } from "lucide-react";
 import { isWasteCollectorRole } from "@/lib/company-application";
 import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
+import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
+
+const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+const DISTRICTS = rwandaAdminData.map((district) => ({ id: district.id, name: district.name }));
+type Day = typeof WEEK_DAYS[number];
+type WasteType = "General Waste" | "Recyclables" | "Organic Waste" | "Hazardous";
+type TaskStatus = "Scheduled" | "In Progress" | "Completed" | "Cancelled";
+
+interface ScheduleTask {
+  id: number;
+  districtId: string;
+  districtName: string;
+  scheduleDate: string;
+  day: Day;
+  sectorId: string;
+  sectorName: string;
+  cells: string[];
+  driver: string;
+  vehicle: string;
+  startTime: string;
+  wasteType: WasteType;
+  status: TaskStatus;
+  notes: string;
+}
+
+const normalizeText = (value: string) => value.trim().toLowerCase();
+
+const getDistrictFromCompany = (district?: string) => {
+  if (!district) return undefined;
+  const normalized = normalizeText(district);
+
+  return rwandaAdminData.find((item) => normalizeText(item.id) === normalized || normalizeText(item.name) === normalized);
+};
 
 export default function WasteCompanyDashboard() {
   const router = useRouter();
@@ -20,6 +54,27 @@ export default function WasteCompanyDashboard() {
   const [assignmentVehicle, setAssignmentVehicle] = useState("");
   const [assignmentZone, setAssignmentZone] = useState("");
   const [assignments, setAssignments] = useState<Array<{ driver: string; vehicle: string; zone: string; createdAt: string }>>([]);
+  const [districtDraft, setDistrictDraft] = useState("");
+  const [districtSaving, setDistrictSaving] = useState(false);
+  const [districtMessage, setDistrictMessage] = useState("");
+  const [scheduleMessage, setScheduleMessage] = useState("");
+
+  const [scheduleTasks, setScheduleTasks] = useState<ScheduleTask[]>([]);
+  const [scheduleModal, setScheduleModal] = useState(false);
+  const [editTask, setEditTask] = useState<ScheduleTask | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    scheduleDate: new Date().toISOString().slice(0, 10),
+    day: "Monday" as Day,
+    sectorId: "",
+    cells: [] as string[],
+    driver: "",
+    vehicle: "",
+    startTime: "08:00",
+    wasteType: "General Waste" as WasteType,
+    notes: "",
+  });
+  const [scheduleView, setScheduleView] = useState<"week" | "list">("week");
+  const [activeSection, setActiveSection] = useState<string>("top-section");
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -49,10 +104,77 @@ export default function WasteCompanyDashboard() {
     void loadCompany();
   }, [router, userInfo]);
 
+  const companyDistrict = useMemo(() => getDistrictFromCompany(application?.district), [application?.district]);
+  const districtSectors = useMemo(() => (companyDistrict ? getSectorsByDistrict(companyDistrict.id) : []), [companyDistrict]);
+  const selectedSector = useMemo(
+    () => districtSectors.find((sector) => sector.id === scheduleForm.sectorId || sector.name === scheduleForm.sectorId),
+    [districtSectors, scheduleForm.sectorId],
+  );
+  const availableCells = useMemo(
+    () => (companyDistrict && selectedSector ? getCellsBySector(companyDistrict.id, selectedSector.id) : []),
+    [companyDistrict, selectedSector],
+  );
+
+  useEffect(() => {
+    setDistrictDraft(companyDistrict?.id ?? application?.district ?? "");
+  }, [application?.district, companyDistrict?.id]);
+
+  useEffect(() => {
+    const loadSchedules = async () => {
+      if (!application) return;
+
+      try {
+        const res = await api.companySchedules.list(application.id);
+        const nextTasks = res.schedules.map((schedule) => ({
+          id: schedule.id,
+          districtId: schedule.district_id || companyDistrict?.id || "",
+          districtName: schedule.district_name || companyDistrict?.name || application.district || "",
+          scheduleDate: schedule.schedule_date || new Date().toISOString().slice(0, 10),
+          day: schedule.day as Day,
+          sectorId: schedule.sector_id || "",
+          sectorName: schedule.sector_name || "",
+          cells: schedule.cells || [],
+          driver: schedule.driver || "",
+          vehicle: schedule.vehicle || "",
+          startTime: schedule.start_time || "08:00",
+          wasteType: (schedule.waste_type as WasteType) || "General Waste",
+          status: (schedule.status as TaskStatus) || "Scheduled",
+          notes: schedule.notes || "",
+        }));
+        setScheduleTasks(nextTasks);
+      } catch {
+        setScheduleTasks([]);
+      }
+    };
+
+    void loadSchedules();
+  }, [application, companyDistrict?.id, companyDistrict?.name]);
+
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("user_info");
     router.push("/signin");
+  };
+
+  const handleDistrictSave = async () => {
+    if (!application) return;
+    if (!districtDraft.trim()) {
+      setDistrictMessage("Please select a district first.");
+      return;
+    }
+
+    setDistrictSaving(true);
+    setDistrictMessage("");
+
+    try {
+      const updated = await api.companies.update(application.id, { district: districtDraft });
+      setApplication(updated.company);
+      setDistrictMessage("District updated successfully.");
+    } catch (error) {
+      setDistrictMessage(error instanceof Error ? error.message : "Failed to update district.");
+    } finally {
+      setDistrictSaving(false);
+    }
   };
 
   if (loading || !userInfo || !isWasteCollectorRole(userInfo.role) || !application || application.status !== "approved") {
@@ -100,19 +222,74 @@ export default function WasteCompanyDashboard() {
     { label: "Drivers", icon: Users, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "drivers-section" },
     { label: "Vehicles", icon: Car, color: "text-purple-600 bg-purple-50 hover:bg-purple-100", target: "vehicles-section" },
     { label: "Assignment", icon: Route, color: "text-teal-600 bg-teal-50 hover:bg-teal-100", target: "assignment-section" },
+    { label: "Schedule", icon: CalendarDays, color: "text-green-700 bg-green-50 hover:bg-green-100", target: "schedule-section" },
     { label: "Documents", icon: FileText, color: "text-orange-600 bg-orange-50 hover:bg-orange-100", target: "documents-section" },
     { label: "Overview", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
   ];
 
-  const assignmentZones = mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera"];
+  const assignmentZones = companyDistrict ? districtSectors.map((sector) => sector.name) : (mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera"]);
 
   const scrollToSection = (id: string) => {
+    setActiveSection(id);
     const element = document.getElementById(id);
     if (element) element.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const goToOnboarding = () => {
     router.push("/company-onboarding");
+  };
+
+  const resetScheduleForm = () => {
+    setScheduleForm({
+      scheduleDate: new Date().toISOString().slice(0, 10),
+      day: "Monday",
+      sectorId: "",
+      cells: [],
+      driver: "",
+      vehicle: "",
+      startTime: "08:00",
+      wasteType: "General Waste",
+      notes: "",
+    });
+  };
+
+  const openScheduleModal = (task?: ScheduleTask) => {
+    if (task) {
+      setEditTask(task);
+      setScheduleForm({
+        scheduleDate: task.scheduleDate,
+        day: task.day,
+        sectorId: task.sectorId,
+        cells: task.cells,
+        driver: task.driver,
+        vehicle: task.vehicle,
+        startTime: task.startTime,
+        wasteType: task.wasteType,
+        notes: task.notes,
+      });
+    } else {
+      setEditTask(null);
+      resetScheduleForm();
+    }
+
+    setScheduleModal(true);
+  };
+
+  const closeScheduleModal = () => {
+    setScheduleModal(false);
+    setEditTask(null);
+    resetScheduleForm();
+  };
+
+  const scheduleByDay = WEEK_DAYS.map((day) => ({
+    day,
+    tasks: scheduleTasks.filter((task) => task.day === day),
+  }));
+
+  const scheduleStats = {
+    planned: scheduleTasks.length,
+    sectors: new Set(scheduleTasks.map((task) => task.sectorId)).size,
+    completed: scheduleTasks.filter((task) => task.status === "Completed").length,
   };
 
   const handleCreateAssignment = () => {
@@ -135,12 +312,124 @@ export default function WasteCompanyDashboard() {
     setAssignmentZone("");
   };
 
-  const metrics = [
-    { label: "Drivers", value: mapped.drivers.length, icon: <Users size={20} className="text-blue-600" />, bg: "bg-blue-50" },
-    { label: "Vehicles", value: mapped.cars.length, icon: <Car size={20} className="text-purple-600" />, bg: "bg-purple-50" },
-    { label: "Service areas", value: mapped.serviceAreas.length, icon: <MapPin size={20} className="text-emerald-600" />, bg: "bg-emerald-50" },
-    { label: "Documents", value: totalDocs, icon: <FileText size={20} className="text-orange-500" />, bg: "bg-orange-50" },
-  ];
+  const mapTaskToPayload = (task: ScheduleTask) => ({
+    district_id: task.districtId,
+    district_name: task.districtName,
+    schedule_date: task.scheduleDate,
+    day: task.day,
+    sector_id: task.sectorId,
+    sector_name: task.sectorName,
+    cells: task.cells,
+    driver: task.driver,
+    vehicle: task.vehicle,
+    start_time: task.startTime,
+    waste_type: task.wasteType,
+    status: task.status,
+    notes: task.notes,
+  });
+
+  const handleSaveScheduleTask = async () => {
+    if (!application || !companyDistrict || !scheduleForm.sectorId || scheduleForm.cells.length === 0) {
+      return;
+    }
+
+    const sector = districtSectors.find((item) => item.id === scheduleForm.sectorId || item.name === scheduleForm.sectorId);
+    if (!sector) return;
+
+    setScheduleMessage("");
+
+    const nextTask: ScheduleTask = {
+      id: editTask?.id ?? Date.now(),
+      districtId: companyDistrict.id,
+      districtName: companyDistrict.name,
+      scheduleDate: scheduleForm.scheduleDate,
+      day: scheduleForm.day,
+      sectorId: sector.id,
+      sectorName: sector.name,
+      cells: scheduleForm.cells,
+      driver: scheduleForm.driver,
+      vehicle: scheduleForm.vehicle,
+      startTime: scheduleForm.startTime,
+      wasteType: scheduleForm.wasteType,
+      status: editTask?.status ?? "Scheduled",
+      notes: scheduleForm.notes.trim(),
+    };
+
+    try {
+      if (editTask) {
+        const updated = await api.companySchedules.update(application.id, editTask.id, mapTaskToPayload(nextTask));
+        const savedTask: ScheduleTask = {
+          id: updated.schedule.id,
+          districtId: updated.schedule.district_id || nextTask.districtId,
+          districtName: updated.schedule.district_name || nextTask.districtName,
+          scheduleDate: updated.schedule.schedule_date || nextTask.scheduleDate,
+          day: updated.schedule.day as Day,
+          sectorId: updated.schedule.sector_id || nextTask.sectorId,
+          sectorName: updated.schedule.sector_name || nextTask.sectorName,
+          cells: updated.schedule.cells || nextTask.cells,
+          driver: updated.schedule.driver || nextTask.driver,
+          vehicle: updated.schedule.vehicle || nextTask.vehicle,
+          startTime: updated.schedule.start_time || nextTask.startTime,
+          wasteType: (updated.schedule.waste_type as WasteType) || nextTask.wasteType,
+          status: (updated.schedule.status as TaskStatus) || nextTask.status,
+          notes: updated.schedule.notes || nextTask.notes,
+        };
+
+        setScheduleTasks((current) => current.map((entry) => (entry.id === editTask.id ? savedTask : entry)));
+      } else {
+        const created = await api.companySchedules.create(application.id, mapTaskToPayload(nextTask));
+        const savedTask: ScheduleTask = {
+          id: created.schedule.id,
+          districtId: created.schedule.district_id || nextTask.districtId,
+          districtName: created.schedule.district_name || nextTask.districtName,
+          scheduleDate: created.schedule.schedule_date || nextTask.scheduleDate,
+          day: created.schedule.day as Day,
+          sectorId: created.schedule.sector_id || nextTask.sectorId,
+          sectorName: created.schedule.sector_name || nextTask.sectorName,
+          cells: created.schedule.cells || nextTask.cells,
+          driver: created.schedule.driver || nextTask.driver,
+          vehicle: created.schedule.vehicle || nextTask.vehicle,
+          startTime: created.schedule.start_time || nextTask.startTime,
+          wasteType: (created.schedule.waste_type as WasteType) || nextTask.wasteType,
+          status: (created.schedule.status as TaskStatus) || nextTask.status,
+          notes: created.schedule.notes || nextTask.notes,
+        };
+
+        setScheduleTasks((current) => [savedTask, ...current]);
+      }
+
+      setScheduleMessage("Weekly task saved to the database.");
+      closeScheduleModal();
+    } catch (error) {
+      setScheduleMessage(error instanceof Error ? error.message : "Failed to save weekly task.");
+    }
+  };
+
+  const handleDeleteScheduleTask = async (taskId: number) => {
+    if (!application) return;
+    try {
+      await api.companySchedules.remove(application.id, taskId);
+      setScheduleTasks((current) => current.filter((task) => task.id !== taskId));
+      setScheduleMessage("Weekly task deleted.");
+    } catch (error) {
+      setScheduleMessage(error instanceof Error ? error.message : "Failed to delete weekly task.");
+    }
+  };
+
+  const handleStatusChange = async (taskId: number, status: TaskStatus) => {
+    if (!application) return;
+    const task = scheduleTasks.find((entry) => entry.id === taskId);
+    if (!task) return;
+
+    setScheduleTasks((current) => current.map((entry) => (entry.id === taskId ? { ...entry, status } : entry)));
+
+    try {
+      await api.companySchedules.update(application.id, taskId, { ...mapTaskToPayload(task), status });
+    } catch (error) {
+      setScheduleTasks((current) => current.map((entry) => (entry.id === taskId ? task : entry)));
+      setScheduleMessage(error instanceof Error ? error.message : "Failed to update task status.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -167,24 +456,28 @@ export default function WasteCompanyDashboard() {
 
         <nav className="flex-1 px-4 py-5 space-y-2">
           {[
-            { label: "Dashboard", icon: LayoutDashboard, active: true, target: "top-section" },
+            { label: "Dashboard", icon: LayoutDashboard, target: "top-section" },
             { label: "Drivers", icon: Users, target: "drivers-section" },
             { label: "Vehicles", icon: Car, target: "vehicles-section" },
             { label: "Assignment", icon: Route, target: "assignment-section" },
+            { label: "Schedule", icon: CalendarDays, target: "schedule-section" },
             { label: "Documents", icon: FileText, target: "documents-section" },
             { label: "Overview", icon: Building2, target: "overview-section" },
             { label: "Settings", icon: Settings, target: "top-section" },
-          ].map(({ label, icon: Icon, active, target }) => (
-            <button
-              key={label}
-              onClick={() => scrollToSection(target)}
-              className={`w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${active ? "bg-white/15 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-              <span className="ml-auto opacity-60">›</span>
-            </button>
-          ))}
+          ].map(({ label, icon: Icon, target }) => {
+            const active = activeSection === target;
+            return (
+              <button
+                key={label}
+                onClick={() => scrollToSection(target)}
+                className={`w-full flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${active ? "bg-white/15 text-white" : "text-white/80 hover:bg-white/10 hover:text-white"}`}
+              >
+                <Icon size={18} />
+                <span>{label}</span>
+                <span className="ml-auto opacity-60">›</span>
+              </button>
+            );
+          })}
         </nav>
 
         <div className="px-4 py-5 border-t border-white/10">
@@ -213,6 +506,7 @@ export default function WasteCompanyDashboard() {
         </header>
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-6" id="top-section">
+          <div className={activeSection === "top-section" ? "space-y-6" : "hidden"}>
           <div className="lg:hidden rounded-2xl bg-white border border-gray-200 shadow-sm p-4 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Sections</p>
             <div className="grid grid-cols-2 gap-2">
@@ -241,6 +535,7 @@ export default function WasteCompanyDashboard() {
               <span className="flex items-center gap-1"><Mail size={13} /> {application.email}</span>
               <span className="flex items-center gap-1"><Phone size={13} /> {application.phone}</span>
               <span className="flex items-center gap-1"><MapPin size={13} /> {application.address || "Address not set"}</span>
+              <span className="flex items-center gap-1"><MapPin size={13} /> {companyDistrict?.name || application.district || "District not set"}</span>
             </div>
           </div>
 
@@ -264,6 +559,49 @@ export default function WasteCompanyDashboard() {
               </div>
             ))}
           </div>
+
+          <Card title="Working District" icon={<MapPin size={16} className="text-green-600" />}>
+            <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-gray-700">Select district</label>
+                  <select
+                    value={districtDraft}
+                    onChange={(e) => setDistrictDraft(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="">Choose a district</option>
+                    {DISTRICTS.map((district) => (
+                      <option key={district.id} value={district.id}>
+                        {district.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-sm text-gray-500">
+                  Update the company district here to unlock sector planning, cell selection, and district-scoped assignments.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleDistrictSave}
+                    disabled={districtSaving}
+                    className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition disabled:cursor-not-allowed disabled:bg-green-300"
+                  >
+                    <MapPin size={15} /> {districtSaving ? "Saving..." : "Save district"}
+                  </button>
+                  {districtMessage && <span className="text-sm text-gray-500">{districtMessage}</span>}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-gray-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Current district</p>
+                <p className="mt-2 text-xl font-bold text-gray-900">{companyDistrict?.name || "Not set"}</p>
+                <p className="mt-2 text-sm text-gray-500">
+                  {companyDistrict ? "All assignment and scheduling tools use this district." : "Choose a district to start using the assignment and scheduler tools."}
+                </p>
+              </div>
+            </div>
+          </Card>
 
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
             <div className="xl:col-span-4 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -303,7 +641,7 @@ export default function WasteCompanyDashboard() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 scroll-mt-28" id="overview-section">
+          <div className={`grid grid-cols-1 lg:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'overview-section' ? 'hidden' : ''}`} id="overview-section">
             <Card title="Owner & Manager Information" icon={<User size={16} className="text-emerald-600" />}>
               <InfoRow label="Owner" value={application.owner_name || "—"} />
               <InfoRow label="Owner email" value={application.owner_email || "—"} />
@@ -317,6 +655,7 @@ export default function WasteCompanyDashboard() {
             </Card>
 
             <Card title="Company Overview" icon={<Building2 size={16} className="text-green-600" />}>
+              <InfoRow label="District" value={companyDistrict?.name || application.district || "—"} />
               <InfoRow label="Service areas" value={mapped.serviceAreas.join(", ") || "—"} />
               <InfoRow label="Drivers" value={String(mapped.drivers.length)} />
               <InfoRow label="Vehicles" value={String(mapped.cars.length)} />
@@ -328,9 +667,10 @@ export default function WasteCompanyDashboard() {
                 </div>
               )}
             </Card>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28" id="drivers-section">
+          <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'drivers-section' ? 'hidden' : ''}`} id="drivers-section">
             <Card title="Driver Roster" icon={<Users size={16} className="text-blue-600" />}>
               {mapped.drivers.length === 0 ? (
                 <p className="text-sm text-gray-400">No drivers on record.</p>
@@ -369,9 +709,9 @@ export default function WasteCompanyDashboard() {
                 <p className="mt-2 text-sm text-gray-500">You are fully approved. Keep drivers, vehicles, and documents updated to maintain active operations.</p>
               </div>
             </Card>
-          </div>
+            </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28" id="vehicles-section">
+          <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'vehicles-section' ? 'hidden' : ''}`} id="vehicles-section">
             <Card title="Fleet / Vehicles" icon={<Car size={16} className="text-purple-600" />}>
               {mapped.cars.length === 0 ? (
                 <p className="text-sm text-gray-400">No vehicles on record.</p>
@@ -411,17 +751,162 @@ export default function WasteCompanyDashboard() {
                 ))}
               </div>
             </Card>
-          </div>
+            </div>
 
           <Card title="Certificates & Documents" icon={<ShieldCheck size={16} className="text-orange-500" />}>
-            <div className="grid gap-4 md:grid-cols-3 scroll-mt-28" id="documents-section">
+            <div className={`grid gap-4 md:grid-cols-3 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'documents-section' ? 'hidden' : ''}`} id="documents-section">
               <DocList label="Business Certificates" files={mapped.certificates} />
               <DocList label="RDB Certificates" files={mapped.rdbCertificates} />
               <DocList label="Tax Clearance" files={mapped.taxCertificates} />
             </div>
           </Card>
 
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28" id="assignment-section">
+          <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'schedule-section' ? 'hidden' : ''}`} id="schedule-section">
+            <Card title="Weekly District Scheduler" icon={<CalendarDays size={16} className="text-green-700" />}>
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-green-100 bg-green-50/70 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-green-700 px-3 py-1 text-xs font-semibold text-white">
+                      <CheckCircle2 size={12} /> District locked
+                    </span>
+                    <span className="text-sm font-semibold text-green-900">
+                      {companyDistrict ? companyDistrict.name : "District not set"}
+                    </span>
+                  </div>
+                  <p className="text-sm text-green-900/80">
+                    Scheduling is limited to one district per company. Use this planner to assign sectors and cells for the week inside {companyDistrict ? companyDistrict.name : "your district"}.
+                  </p>
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="rounded-xl bg-white px-3 py-2">
+                      <p className="text-lg font-bold text-gray-900">{scheduleStats.planned}</p>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Tasks</p>
+                    </div>
+                    <div className="rounded-xl bg-white px-3 py-2">
+                      <p className="text-lg font-bold text-gray-900">{scheduleStats.sectors}</p>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Sectors</p>
+                    </div>
+                    <div className="rounded-xl bg-white px-3 py-2">
+                      <p className="text-lg font-bold text-gray-900">{scheduleStats.completed}</p>
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500">Done</p>
+                    </div>
+                  </div>
+                </div>
+
+                {!companyDistrict ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Your company profile does not have a district yet. Use the district panel above to select your working district, then return here to build the weekly schedule.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {districtSectors.map((sector) => (
+                        <span key={sector.id} className="rounded-full border border-green-100 bg-white px-3 py-1 text-xs font-medium text-green-800">
+                          {sector.name}
+                        </span>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button onClick={() => openScheduleModal()} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition">
+                        <Plus size={15} /> Add weekly task
+                      </button>
+                      <button onClick={() => setScheduleView("week")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${scheduleView === "week" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                        Week view
+                      </button>
+                      <button onClick={() => setScheduleView("list")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${scheduleView === "list" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                        List view
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card title="Weekly Plan Overview" icon={<ClipboardList size={16} className="text-indigo-600" />}>
+              {!companyDistrict ? (
+                <p className="text-sm text-gray-400">No district available yet, so no weekly plan can be built.</p>
+              ) : scheduleTasks.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
+                  No weekly tasks planned yet. Add the first route to start organizing collections by sector.
+                </div>
+              ) : scheduleView === "week" ? (
+                <div className="space-y-3">
+                  {scheduleByDay.map(({ day, tasks }) => (
+                    <div key={day} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold text-gray-900">{day}</p>
+                        <span className="text-xs font-medium text-gray-500">{tasks.length} task{tasks.length === 1 ? "" : "s"}</span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {tasks.length === 0 ? (
+                          <p className="text-xs text-gray-400">No tasks scheduled.</p>
+                        ) : (
+                          tasks.map((task) => (
+                            <div key={task.id} className="rounded-xl border border-gray-200 bg-white p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-xs text-gray-400">Date: {task.scheduleDate}</p>
+                                  <p className="font-semibold text-gray-900">{task.sectorName}</p>
+                                  <p className="text-xs text-gray-500">Cells: {task.cells.join(", ")}</p>
+                                  <p className="text-xs text-gray-500">{task.driver || "No driver"} • {task.vehicle || "No vehicle"} • {task.startTime}</p>
+                                </div>
+                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${task.status === "Completed" ? "bg-emerald-100 text-emerald-700" : task.status === "In Progress" ? "bg-blue-100 text-blue-700" : task.status === "Cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
+                                  {task.status}
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {scheduleTasks.map((task) => (
+                    <div key={task.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-900">{task.day} • {task.sectorName}</p>
+                          <p className="text-xs text-gray-500">{task.scheduleDate}</p>
+                          <p className="text-xs text-gray-500">{task.districtName}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => openScheduleModal(task)} className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-200 hover:bg-gray-100 transition">
+                            <Edit3 size={12} /> Edit
+                          </button>
+                          <button onClick={() => handleDeleteScheduleTask(task.id)} className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-100 hover:bg-red-50 transition">
+                            <Trash2 size={12} /> Delete
+                          </button>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600">Cells: {task.cells.join(", ")}</p>
+                      <div className="grid gap-3 md:grid-cols-3 text-xs text-gray-500">
+                        <InfoRow label="Driver" value={task.driver || "—"} />
+                        <InfoRow label="Vehicle" value={task.vehicle || "—"} />
+                        <InfoRow label="Time" value={task.startTime} />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-gray-500">Status</span>
+                          <select value={task.status} onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)} className="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                            <option value="Scheduled">Scheduled</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Cancelled">Cancelled</option>
+                          </select>
+                        </div>
+                        <span className="text-xs text-gray-500">{task.wasteType}</span>
+                      </div>
+                      {task.notes && <p className="text-xs text-gray-500">{task.notes}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'assignment-section' ? 'hidden' : ''}`} id="assignment-section">
             <Card title="Operations / Assignment" icon={<Route size={16} className="text-teal-600" />}>
               <div className="space-y-4">
                 <p className="text-sm text-gray-600">
@@ -476,7 +961,127 @@ export default function WasteCompanyDashboard() {
                 </div>
               )}
             </Card>
-          </div>
+            </div>
+
+          {scheduleModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
+              <div className="w-full max-w-3xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl border border-gray-100 flex flex-col">
+                <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-500">Weekly task planner</p>
+                    <h3 className="text-lg font-bold text-gray-900">{editTask ? "Edit scheduled task" : "Add new weekly task"}</h3>
+                  </div>
+                  <button onClick={closeScheduleModal} className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-6 py-5">
+                  <div className="grid gap-5 md:grid-cols-2">
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Date</label>
+                    <input
+                      value={scheduleForm.scheduleDate}
+                      onChange={(e) => setScheduleForm((current) => ({ ...current, scheduleDate: e.target.value }))}
+                      type="date"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Day</label>
+                    <select value={scheduleForm.day} onChange={(e) => setScheduleForm((current) => ({ ...current, day: e.target.value as Day }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                      {WEEK_DAYS.map((day) => <option key={day}>{day}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Sector</label>
+                    <select value={scheduleForm.sectorId} onChange={(e) => setScheduleForm((current) => ({ ...current, sectorId: e.target.value, cells: [] }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                      <option value="">Select sector</option>
+                      {districtSectors.map((sector) => <option key={sector.id} value={sector.id}>{sector.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-3 md:col-span-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="block text-sm font-medium text-gray-700">Cells / locations</label>
+                      <span className="text-xs text-gray-400">Choose one or more cells in the selected sector</span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {availableCells.length === 0 ? (
+                        <p className="text-sm text-gray-400 sm:col-span-2">Pick a sector to see available cells.</p>
+                      ) : (
+                        availableCells.map((cell) => {
+                          const selected = scheduleForm.cells.includes(cell.name);
+                          return (
+                            <button
+                              key={cell.id}
+                              type="button"
+                              onClick={() => setScheduleForm((current) => ({
+                                ...current,
+                                cells: selected ? current.cells.filter((value) => value !== cell.name) : [...current.cells, cell.name],
+                              }))}
+                              className={`rounded-xl border px-4 py-3 text-left text-sm font-medium transition ${selected ? "border-green-600 bg-green-50 text-green-800" : "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"}`}
+                            >
+                              {cell.name}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Driver</label>
+                    <select value={scheduleForm.driver} onChange={(e) => setScheduleForm((current) => ({ ...current, driver: e.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                      <option value="">Select driver</option>
+                      {mapped.drivers.map((driver, index) => <option key={`${driver.name || "driver"}-${index}`} value={driver.name || `Driver ${index + 1}`}>{driver.name || `Driver ${index + 1}`}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Vehicle</label>
+                    <select value={scheduleForm.vehicle} onChange={(e) => setScheduleForm((current) => ({ ...current, vehicle: e.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                      <option value="">Select vehicle</option>
+                      {mapped.cars.map((car, index) => <option key={`${car.plateNumber || "vehicle"}-${index}`} value={car.plateNumber || `Vehicle ${index + 1}`}>{car.plateNumber || `Vehicle ${index + 1}`}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Start time</label>
+                    <input value={scheduleForm.startTime} onChange={(e) => setScheduleForm((current) => ({ ...current, startTime: e.target.value }))} type="time" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700">Waste type</label>
+                    <select value={scheduleForm.wasteType} onChange={(e) => setScheduleForm((current) => ({ ...current, wasteType: e.target.value as WasteType }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                      <option>General Waste</option>
+                      <option>Recyclables</option>
+                      <option>Organic Waste</option>
+                      <option>Hazardous</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-3 md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Notes</label>
+                    <textarea value={scheduleForm.notes} onChange={(e) => setScheduleForm((current) => ({ ...current, notes: e.target.value }))} rows={3} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Route notes, pickup instructions, or special handling details" />
+                  </div>
+                </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                  <button onClick={closeScheduleModal} className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveScheduleTask} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition">
+                    <CheckCircle2 size={15} /> {editTask ? "Update task" : "Save task"}
+                  </button>
+                </div>
+                {scheduleMessage && <div className="px-6 pb-4 text-sm text-gray-600">{scheduleMessage}</div>}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

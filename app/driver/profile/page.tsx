@@ -134,6 +134,7 @@ export default function DriverProfilePage() {
       ownerPhone: form.ownerPhone,
       companyAddress: application?.companyAddress ?? "",
       companyDescription: application?.companyDescription ?? "",
+      district: application?.district ?? "",
       companyLogo: application?.companyLogo ?? "",
       companyImages: form.companyImages,
       certificates: form.certificates,

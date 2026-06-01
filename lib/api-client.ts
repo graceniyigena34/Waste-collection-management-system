@@ -1,8 +1,22 @@
 "use client";
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
-  "https://backend-waste-collection-management.onrender.com";
+// Allowed API origins — prevents SSRF by restricting fetch to known hosts
+const ALLOWED_ORIGINS = [
+  "http://localhost:8000",
+  "http://192.168.56.1:8000",
+  "https://backend-waste-collection-management.onrender.com",
+];
+
+export const API_BASE_URL = (() => {
+  const raw = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
+    "https://backend-waste-collection-management.onrender.com";
+  // Validate the base URL is in the allowlist (SSRF fix)
+  if (typeof window !== "undefined" && !ALLOWED_ORIGINS.some(o => raw.startsWith(o))) {
+    console.warn("[EcoTrack] API_BASE_URL not in allowlist, using default.");
+    return "https://backend-waste-collection-management.onrender.com";
+  }
+  return raw;
+})();
 
 export type BackendRole = "citizen" | "waste_collector" | "admin";
 
@@ -78,6 +92,26 @@ export interface BackendCompanyProfile {
   updated_at?: string;
 }
 
+export interface BackendCompanySchedule {
+  id: number;
+  company_id: number;
+  district_id?: string;
+  district_name?: string;
+  schedule_date: string;
+  day: string;
+  sector_id?: string;
+  sector_name?: string;
+  cells: string[];
+  driver?: string;
+  vehicle?: string;
+  start_time?: string;
+  waste_type: string;
+  status: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 class ApiError extends Error {
   status: number;
   body: unknown;
@@ -89,9 +123,21 @@ class ApiError extends Error {
   }
 }
 
+// ── Secure session helpers ──────────────────────────────────────────────────
+// NOTE: localStorage is used here for simplicity in a frontend-only demo.
+// In production, use httpOnly cookies via a server-side session to prevent XSS.
+// The token is never rendered into the DOM — it is only sent in Authorization headers.
+
+const SESSION_KEY = "auth_token";
+const USER_KEY = "user_info";
+
+// Sanitize a string value before storing — strips any script-like content
+const sanitize = (val: string): string =>
+  val.replace(/<[^>]*>/g, "").trim();
+
 const readAuthToken = (): string | null => {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("auth_token");
+  return window.localStorage.getItem(SESSION_KEY);
 };
 
 const readJson = <T,>(key: string): T | null => {
@@ -106,16 +152,17 @@ const readJson = <T,>(key: string): T | null => {
 };
 
 export const getStoredUserInfo = (): FrontendUserInfo | null =>
-  readJson<FrontendUserInfo>("user_info");
+  readJson<FrontendUserInfo>(USER_KEY);
 
 export const storeAuth = (payload: BackendAuthResponse) => {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem("auth_token", payload.token);
+  // Store only the JWT — never render it into the DOM
+  window.localStorage.setItem(SESSION_KEY, payload.token);
   window.localStorage.setItem(
-    "user_info",
+    USER_KEY,
     JSON.stringify({
-      fullName: payload.user.full_name,
-      email: payload.user.email,
+      fullName: sanitize(payload.user.full_name),
+      email: sanitize(payload.user.email),
       role: payload.user.role,
       userId: String(payload.user.id),
     } satisfies FrontendUserInfo),
@@ -124,8 +171,8 @@ export const storeAuth = (payload: BackendAuthResponse) => {
 
 export const clearAuth = () => {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem("auth_token");
-  window.localStorage.removeItem("user_info");
+  window.localStorage.removeItem(SESSION_KEY);
+  window.localStorage.removeItem(USER_KEY);
 };
 
 const toMessage = (body: unknown, fallback: string) => {
@@ -368,6 +415,44 @@ export const api = {
       apiFetch<{ message: string; reason?: string; company: BackendCompanyProfile }>(`/api/companies/${id}/reject`, {
         method: "PUT",
         body: JSON.stringify({ reason }),
+        auth: true,
+      }),
+  },
+
+  companySchedules: {
+    list: (companyId: number) =>
+      apiFetch<{ schedules: BackendCompanySchedule[] }>(`/api/company-schedules/company/${companyId}`, {
+        method: "GET",
+        auth: true,
+      }),
+
+    listByDate: (companyId: number, scheduleDate: string) =>
+      apiFetch<{ schedules: BackendCompanySchedule[] }>(`/api/company-schedules/company/${companyId}/date/${encodeURIComponent(scheduleDate)}`, {
+        method: "GET",
+        auth: true,
+      }),
+
+    create: (companyId: number, payload: Partial<Omit<BackendCompanySchedule, "id" | "company_id" | "created_at" | "updated_at">>) =>
+      apiFetch<{ message: string; schedule: BackendCompanySchedule }>(`/api/company-schedules/company/${companyId}`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    update: (
+      companyId: number,
+      scheduleId: number,
+      payload: Partial<Omit<BackendCompanySchedule, "id" | "company_id" | "created_at" | "updated_at">>,
+    ) =>
+      apiFetch<{ message: string; schedule: BackendCompanySchedule }>(`/api/company-schedules/company/${companyId}/${scheduleId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    remove: (companyId: number, scheduleId: number) =>
+      apiFetch<{ message: string }>(`/api/company-schedules/company/${companyId}/${scheduleId}`, {
+        method: "DELETE",
         auth: true,
       }),
   },
