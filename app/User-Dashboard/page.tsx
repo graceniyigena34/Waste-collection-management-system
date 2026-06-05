@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Calendar, CreditCard, Bell, MessageSquare,
-  TrendingUp, AlertCircle, CheckCircle, Trash2,
+  AlertCircle, CheckCircle, Trash2,
   MapPin, Route, User, ArrowRight, Truck,
-  Clock, DollarSign, Leaf,
+  Clock, DollarSign,
 } from 'lucide-react';
 
 interface UserInfo { fullName: string; email: string; userId: string; role: string; }
@@ -169,80 +169,43 @@ export default function UserDashboard() {
         </div>
       </div>
 
-      {/* Recent payments + Environmental impact */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-        {/* Recent payments */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold text-gray-800 flex items-center gap-2">
-              <DollarSign size={17} className="text-orange-600" /> Recent Payments
-            </h2>
-            <button onClick={() => router.push('/User-Dashboard/Payments')} className="text-xs text-green-700 font-semibold hover:underline flex items-center gap-1">
-              View all <ArrowRight size={12} />
-            </button>
-          </div>
-          <div className="space-y-3">
-            {payments.map(p => (
-              <div key={p.id} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition">
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${p.status === 'paid' ? 'bg-green-100' : 'bg-yellow-100'}`}>
-                    <CreditCard size={16} className={p.status === 'paid' ? 'text-green-600' : 'text-yellow-600'} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">{p.description}</p>
-                    <p className="text-xs text-gray-500">{p.date}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-gray-800">{p.amount}</p>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusStyle[p.status]}`}>{p.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-          {pendingPay && (
-            <button
-              onClick={() => router.push('/User-Dashboard/Payments')}
-              className="mt-4 w-full py-2.5 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 transition flex items-center justify-center gap-2"
-            >
-              Pay Now – {pendingPay.amount} <ArrowRight size={15} />
-            </button>
-          )}
-        </div>
-
-        {/* Environmental impact */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-          <h2 className="font-bold text-gray-800 flex items-center gap-2 mb-4">
-            <Leaf size={17} className="text-green-600" /> Environmental Impact
+      {/* Recent payments */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-gray-800 flex items-center gap-2">
+            <DollarSign size={17} className="text-orange-600" /> Recent Payments
           </h2>
-          <div className="space-y-5">
-            {[
-              { label: 'Monthly Waste Collected', value: 45, max: 60, unit: 'kg', color: 'bg-green-500' },
-              { label: 'Recycling Rate', value: 78, max: 100, unit: '%', color: 'bg-blue-500' },
-              { label: 'Collection Completion', value: 92, max: 100, unit: '%', color: 'bg-purple-500' },
-            ].map(m => (
-              <div key={m.label}>
-                <div className="flex justify-between text-sm mb-1.5">
-                  <span className="text-gray-600">{m.label}</span>
-                  <span className="font-semibold text-gray-800">{m.value}{m.unit}</span>
+          <button onClick={() => router.push('/User-Dashboard/Payments')} className="text-xs text-green-700 font-semibold hover:underline flex items-center gap-1">
+            View all <ArrowRight size={12} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          {payments.map(p => (
+            <div key={p.id} className="flex items-center justify-between p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${p.status === 'paid' ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                  <CreditCard size={16} className={p.status === 'paid' ? 'text-green-600' : 'text-yellow-600'} />
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2.5">
-                  <div className={`${m.color} h-2.5 rounded-full transition-all`} style={{ width: `${(m.value / m.max) * 100}%` }} />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">{p.description}</p>
+                  <p className="text-xs text-gray-500">{p.date}</p>
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="mt-5 bg-green-50 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <TrendingUp size={18} className="text-green-700" />
+              <div className="text-right">
+                <p className="text-sm font-bold text-gray-800">{p.amount}</p>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusStyle[p.status]}`}>{p.status}</span>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-green-800">Great job!</p>
-              <p className="text-xs text-green-700">Your recycling rate is above the district average of 65%.</p>
-            </div>
-          </div>
+          ))}
         </div>
+        {pendingPay && (
+          <button
+            onClick={() => router.push('/User-Dashboard/Payments')}
+            className="mt-4 w-full py-2.5 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 transition flex items-center justify-center gap-2"
+          >
+            Pay Now – {pendingPay.amount} <ArrowRight size={15} />
+          </button>
+        )}
       </div>
 
       {/* Quick actions */}
