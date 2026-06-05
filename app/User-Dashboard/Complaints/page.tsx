@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from 'react';
-import NotificationCard from '../Notifications/NotificationCard';
 import { Plus, X, AlertCircle, Clock, Truck, FileText } from 'lucide-react';
 
 interface Complaint {
@@ -129,7 +128,7 @@ export default function ComplaintsSection() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-4 sm:p-6 space-y-6 max-w-3xl mx-auto">
       {/* Header with New Complaint Button */}
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-gray-800">My Complaints</h2>
@@ -278,49 +277,6 @@ export default function ComplaintsSection() {
         </div>
       </div>
 
-      {/* Legacy Notifications Section */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Notifications & Updates</h3>
-        <div className="space-y-3">
-          <NotificationCard
-            title="Notifications"
-            subtitle="01-12-2025"
-            status="New"
-            statusColor="green"
-            iconBgColor="orange-100"
-            iconTextColor="orange-600"
-            variant="bordered"
-          />
-
-          <NotificationCard
-            title="Reminder"
-            subtitle="Tomorrow pick day"
-            status="New"
-            statusColor="green"
-            iconBgColor="orange-100"
-            iconTextColor="orange-600"
-            variant="bordered"
-          />
-
-          <NotificationCard
-            title="Extra Pickup"
-            subtitle="Pickup for extra 2-3 PM"
-            iconBgColor="blue-100"
-            iconTextColor="blue-600"
-            variant="bordered"
-          />
-
-          <NotificationCard
-            title="Bill of waste"
-            subtitle="03-12 EM"
-            status="Follow"
-            statusColor="green"
-            iconBgColor="green-100"
-            iconTextColor="green-600"
-            variant="bordered"
-          />
-        </div>
-      </div>
     </div>
   );
 }
