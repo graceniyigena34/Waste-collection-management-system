@@ -171,7 +171,7 @@ export default function Signin() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition bg-white"
                 >
                   <option value="citizen">Citizen</option>
-                  <option value="collector">Waste Collector</option>
+                  <option value="collector">Waste Company</option>
                   <option value="admin">Admin</option>
                 </select>
               </div>

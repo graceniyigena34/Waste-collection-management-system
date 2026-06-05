@@ -37,6 +37,7 @@ export interface CompanyApplicationProfile {
   ownerPhone: string;
   companyAddress: string;
   companyDescription: string;
+  district: string;
   companyLogo: string;
   companyImages: string[];
   certificates: string[];
@@ -137,6 +138,7 @@ const getDefaultProfile = (): CompanyApplicationProfile => ({
   ownerPhone: '',
   companyAddress: '',
   companyDescription: '',
+  district: '',
   companyLogo: '',
   companyImages: [],
   certificates: [],
