@@ -3,7 +3,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send, Building2, Loader2, RefreshCw,
-  Phone, MapPin, CheckCheck, Check, MessageCircle,
+  Phone, MapPin, CheckCheck, MessageCircle,
+  Pencil, Trash2, X, Check,
 } from "lucide-react";
 import { api, type BackendChatMessage, type BackendCompanyProfile } from "@/lib/api-client";
 
@@ -36,6 +37,9 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -125,6 +129,35 @@ export default function ChatPage() {
 
   const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); }
+  };
+
+  const startEdit = (msg: BackendChatMessage) => {
+    setEditingId(msg.id);
+    setEditText(msg.message);
+  };
+
+  const cancelEdit = () => { setEditingId(null); setEditText(""); };
+
+  const saveEdit = async (msg: BackendChatMessage) => {
+    const text = editText.trim();
+    if (!text || !company) return;
+    try {
+      const res = await api.chat.edit(company.id, msg.id, text);
+      setMessages(prev => prev.map(m => m.id === msg.id ? res.chat : m));
+    } catch { /* silent */ }
+    finally { cancelEdit(); }
+  };
+
+  const deleteMsg = async (msg: BackendChatMessage) => {
+    if (!company) return;
+    setMessages(prev => prev.filter(m => m.id !== msg.id));
+    try {
+      await api.chat.remove(company.id, msg.id);
+    } catch {
+      setMessages(prev => [...prev, msg].sort((a, b) =>
+        new Date(a.created_at!).getTime() - new Date(b.created_at!).getTime()
+      ));
+    }
   };
 
   // Group messages by date
@@ -279,9 +312,15 @@ export default function ChatPage() {
                   const isMe = msg.sender_role === "citizen";
                   const isLast = i === msgs.length - 1;
                   const showAvatar = !isMe && (isLast || msgs[i + 1]?.sender_role !== msg.sender_role);
+                  const isEditing = editingId === msg.id;
 
                   return (
-                    <div key={msg.id} className={`flex items-end gap-2 mb-1 ${isMe ? "flex-row-reverse" : ""}`}>
+                    <div
+                      key={msg.id}
+                      className={`flex items-end gap-2 mb-1 ${isMe ? "flex-row-reverse" : ""}`}
+                      onMouseEnter={() => setHoveredId(msg.id)}
+                      onMouseLeave={() => setHoveredId(null)}
+                    >
                       {/* Avatar */}
                       <div className="w-8 flex-shrink-0">
                         {showAvatar && !isMe && (
@@ -296,22 +335,63 @@ export default function ChatPage() {
                         )}
                       </div>
 
-                      {/* Bubble */}
+                      {/* Bubble + actions */}
                       <div className={`max-w-[65%] sm:max-w-[55%] flex flex-col gap-0.5 ${isMe ? "items-end" : "items-start"}`}>
-                        <div className={`px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm ${
-                          isMe
-                            ? "bg-green-700 text-white rounded-2xl rounded-br-sm"
-                            : "bg-white text-gray-800 rounded-2xl rounded-bl-sm border border-gray-100"
-                        }`}>
-                          {msg.message}
-                        </div>
+                        {isEditing ? (
+                          <div className="flex flex-col gap-1 w-full">
+                            <textarea
+                              value={editText}
+                              onChange={e => setEditText(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void saveEdit(msg); }
+                                if (e.key === "Escape") cancelEdit();
+                              }}
+                              autoFocus
+                              rows={2}
+                              className="w-full px-3 py-2 text-sm border border-green-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-200 resize-none"
+                            />
+                            <div className="flex gap-1 justify-end">
+                              <button onClick={() => void saveEdit(msg)} className="p-1.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition">
+                                <Check size={13} />
+                              </button>
+                              <button onClick={cancelEdit} className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition">
+                                <X size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="relative group">
+                            <div className={`px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words shadow-sm ${
+                              isMe
+                                ? "bg-green-700 text-white rounded-2xl rounded-br-sm"
+                                : "bg-white text-gray-800 rounded-2xl rounded-bl-sm border border-gray-100"
+                            }`}>
+                              {msg.message}
+                            </div>
+                            {/* Edit/Delete actions — only for own messages */}
+                            {isMe && hoveredId === msg.id && (
+                              <div className="absolute -top-7 right-0 flex gap-1 bg-white border border-gray-100 shadow-md rounded-xl px-1.5 py-1">
+                                <button
+                                  onClick={() => startEdit(msg)}
+                                  className="p-1 text-gray-500 hover:text-green-700 hover:bg-green-50 rounded-lg transition"
+                                  title="Edit"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                <button
+                                  onClick={() => void deleteMsg(msg)}
+                                  className="p-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className={`flex items-center gap-1 px-1 ${isMe ? "flex-row-reverse" : ""}`}>
                           <span className="text-xs text-gray-400">{fmtTime(msg.created_at)}</span>
-                          {isMe && (
-                            <span className="text-green-500">
-                              <CheckCheck size={13} />
-                            </span>
-                          )}
+                          {isMe && <span className="text-green-500"><CheckCheck size={13} /></span>}
                         </div>
                       </div>
                     </div>

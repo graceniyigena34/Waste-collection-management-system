@@ -457,6 +457,19 @@ export const api = {
         body: JSON.stringify({ message }),
         auth: true,
       }),
+
+    edit: (companyId: number, messageId: number, message: string) =>
+      apiFetch<{ message: string; chat: BackendChatMessage }>(`/api/chat/company/${companyId}/${messageId}`, {
+        method: "PUT",
+        body: JSON.stringify({ message }),
+        auth: true,
+      }),
+
+    remove: (companyId: number, messageId: number) =>
+      apiFetch<{ message: string }>(`/api/chat/company/${companyId}/${messageId}`, {
+        method: "DELETE",
+        auth: true,
+      }),
   },
 
   companySchedules: {
