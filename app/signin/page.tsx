@@ -200,6 +200,13 @@ export default function Signin() {
             </Link>
           </p>
 
+          <p className="text-center mt-3 text-gray-500 text-sm">
+            Forgot your password?{" "}
+            <Link href="/forgot-password" className="text-green-700 hover:underline font-semibold">
+              Reset it
+            </Link>
+          </p>
+
           <p className="text-center mt-3 text-gray-400 text-xs">
             <Link href="/" className="hover:text-green-700 transition">← Back to homepage</Link>
           </p>

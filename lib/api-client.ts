@@ -263,6 +263,18 @@ export const api = {
         body: JSON.stringify(payload),
         auth: true,
       }),
+
+    forgotPassword: (email: string) =>
+      apiFetch<{ message: string; reset_url?: string; token?: string }>("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+
+    resetPassword: (payload: { token: string; new_password: string; confirm_password: string }) =>
+      apiFetch<{ message: string }>("/api/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
 
   households: {
