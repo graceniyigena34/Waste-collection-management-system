@@ -451,10 +451,10 @@ export const api = {
     list: (companyId: number) =>
       apiFetch<{ messages: BackendChatMessage[] }>(`/api/chat/company/${companyId}`, { method: "GET", auth: true }),
 
-    send: (companyId: number, message: string) =>
+    send: (companyId: number, message: string, senderName?: string) =>
       apiFetch<{ message: string; chat: BackendChatMessage }>(`/api/chat/company/${companyId}`, {
         method: "POST",
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ message, sender_name: senderName }),
         auth: true,
       }),
 
