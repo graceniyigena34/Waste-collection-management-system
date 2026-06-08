@@ -92,6 +92,15 @@ export interface BackendCompanyProfile {
   updated_at?: string;
 }
 
+export interface BackendChatMessage {
+  id: number;
+  company_id: number;
+  sender_role: "citizen" | "company";
+  sender_name?: string;
+  message: string;
+  created_at?: string;
+}
+
 export interface BackendCompanySchedule {
   id: number;
   company_id: number;
@@ -240,6 +249,20 @@ export const api = {
     login: (payload: { email: string; password: string }) =>
       apiFetch<BackendAuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify(payload) }),
     profile: () => apiFetch<BackendAuthUser>("/api/auth/profile", { method: "GET", auth: true }),
+
+    updateProfile: (payload: Partial<{ full_name: string; email: string; telephone: string }>) =>
+      apiFetch<{ message: string; user: BackendAuthUser }>("/api/auth/profile", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    changePassword: (payload: { current_password: string; new_password: string; confirm_password: string }) =>
+      apiFetch<{ message: string }>("/api/auth/change-password", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
   },
 
   households: {
@@ -254,6 +277,11 @@ export const api = {
       notes?: string;
     }) => apiFetch("/api/households", { method: "POST", body: JSON.stringify(payload), auth: true }),
     me: () => apiFetch("/api/households/me", { method: "GET", auth: true }),
+
+    update: (payload: Partial<{
+      district: string; sector: string; cell: string; village: string;
+      street_address: string; house_type: string; residents: number; notes: string;
+    }>) => apiFetch("/api/households/me", { method: "PUT", body: JSON.stringify(payload), auth: true }),
   },
 
   companies: {
@@ -415,6 +443,18 @@ export const api = {
       apiFetch<{ message: string; reason?: string; company: BackendCompanyProfile }>(`/api/companies/${id}/reject`, {
         method: "PUT",
         body: JSON.stringify({ reason }),
+        auth: true,
+      }),
+  },
+
+  chat: {
+    list: (companyId: number) =>
+      apiFetch<{ messages: BackendChatMessage[] }>(`/api/chat/company/${companyId}`, { method: "GET", auth: true }),
+
+    send: (companyId: number, message: string) =>
+      apiFetch<{ message: string; chat: BackendChatMessage }>(`/api/chat/company/${companyId}`, {
+        method: "POST",
+        body: JSON.stringify({ message }),
         auth: true,
       }),
   },
