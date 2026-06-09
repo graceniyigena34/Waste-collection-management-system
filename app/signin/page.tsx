@@ -44,6 +44,25 @@ export default function Signin() {
         password: formData.password,
       });
 
+      // Validate selected role matches actual account type
+      const roleMap: Record<string, string> = {
+        citizen: "citizen",
+        collector: "waste_collector",
+        admin: "admin",
+      };
+      if (roleMap[formData.role] !== res.user.role) {
+        const roleLabels: Record<string, string> = {
+          citizen: "Citizen",
+          waste_collector: "Waste Company",
+          admin: "Admin",
+        };
+        setError(
+          `This account is registered as "${roleLabels[res.user.role] ?? res.user.role}". Please select the correct account type.`
+        );
+        setLoading(false);
+        return;
+      }
+
       storeAuth(res);
 
       if (res.user.role === "admin") {

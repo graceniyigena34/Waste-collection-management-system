@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Truck, Mail, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 import { api } from "@/lib/api-client";
@@ -9,19 +9,16 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [resetUrl, setResetUrl] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!email.trim()) { setError("Email address is required."); return; }
     setError("");
     setLoading(true);
     try {
-      const res = await api.auth.forgotPassword(email.trim().toLowerCase());
+      await api.auth.forgotPassword(email.trim().toLowerCase());
       setSubmitted(true);
-      // In production this would be emailed — for demo the backend returns the URL directly
-      if (res.reset_url) setResetUrl(res.reset_url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally {
@@ -51,29 +48,15 @@ export default function ForgotPasswordPage() {
               </div>
               <h2 className="text-xl font-bold text-gray-900 mb-2">Check your inbox</h2>
               <p className="text-sm text-gray-500 mb-6">
-                If <span className="font-semibold text-gray-700">{email}</span> is registered, a
-                password reset link has been sent.
+                We sent a password reset link to{" "}
+                <span className="font-semibold text-gray-700">{email}</span>.
+                Check your inbox (and spam folder) — the link expires in 30 minutes.
               </p>
 
-              {/* Demo reset link (shown because no email service is configured) */}
-              {resetUrl && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left mb-6">
-                  <p className="text-xs font-semibold text-amber-700 mb-1">
-                    Demo mode — reset link (normally sent by email):
-                  </p>
-                  <Link
-                    href={resetUrl.replace(/^https?:\/\/[^/]+/, "")}
-                    className="text-xs text-green-700 font-semibold hover:underline break-all"
-                  >
-                    {resetUrl}
-                  </Link>
-                </div>
-              )}
-
               <p className="text-xs text-gray-400 mb-6">
-                The link expires in 30 minutes. Didn&apos;t receive it?{" "}
+                Didn&apos;t receive it?{" "}
                 <button
-                  onClick={() => { setSubmitted(false); setResetUrl(""); }}
+                  onClick={() => setSubmitted(false)}
                   className="text-green-700 font-semibold hover:underline"
                 >
                   Try again
@@ -87,6 +70,7 @@ export default function ForgotPasswordPage() {
                 <ArrowLeft size={15} /> Back to Sign In
               </Link>
             </div>
+
           ) : (
             /* ── Request form ── */
             <>
