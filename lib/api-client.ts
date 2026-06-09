@@ -567,6 +567,12 @@ export const api = {
 
     remove: (id: number) =>
       apiFetch<{ message: string }>(`/api/complaints/${id}`, { method: "DELETE", auth: true }),
+
+    byDistrict: (district: string) =>
+      apiFetch<BackendComplaint[]>(`/api/complaints/district/${encodeURIComponent(district)}`, {
+        method: "GET",
+        auth: true,
+      }),
   },
 };
 
