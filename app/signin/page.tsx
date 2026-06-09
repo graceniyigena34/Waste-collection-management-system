@@ -44,6 +44,25 @@ export default function Signin() {
         password: formData.password,
       });
 
+      // Validate selected role matches actual account type
+      const roleMap: Record<string, string> = {
+        citizen: "citizen",
+        collector: "waste_collector",
+        admin: "admin",
+      };
+      if (roleMap[formData.role] !== res.user.role) {
+        const roleLabels: Record<string, string> = {
+          citizen: "Citizen",
+          waste_collector: "Waste Company",
+          admin: "Admin",
+        };
+        setError(
+          `This account is registered as "${roleLabels[res.user.role] ?? res.user.role}". Please select the correct account type.`
+        );
+        setLoading(false);
+        return;
+      }
+
       storeAuth(res);
 
       if (res.user.role === "admin") {
@@ -197,6 +216,13 @@ export default function Signin() {
             Don&apos;t have an account?{" "}
             <Link href="/signup" className="text-green-700 hover:underline font-semibold">
               Create one
+            </Link>
+          </p>
+
+          <p className="text-center mt-3 text-gray-500 text-sm">
+            Forgot your password?{" "}
+            <Link href="/forgot-password" className="text-green-700 hover:underline font-semibold">
+              Reset it
             </Link>
           </p>
 

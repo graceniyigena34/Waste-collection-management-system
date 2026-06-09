@@ -92,6 +92,34 @@ export interface BackendCompanyProfile {
   updated_at?: string;
 }
 
+export interface BackendChatMessage {
+  id: number;
+  company_id: number;
+  sender_role: "citizen" | "company";
+  sender_name?: string;
+  message: string;
+  created_at?: string;
+}
+
+export interface BackendComplaint {
+  id: number;
+  user_id: number;
+  household_id?: number;
+  issue_type: string;
+  title: string;
+  description: string;
+  priority: "Low" | "Medium" | "High" | "Urgent";
+  status: "Pending" | "In Progress" | "Resolved";
+  assigned_to?: string;
+  resolution_note?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Admin-only fields (from JOIN)
+  full_name?: string;
+  telephone?: string;
+  zone?: string;
+}
+
 export interface BackendCompanySchedule {
   id: number;
   company_id: number;
@@ -240,6 +268,32 @@ export const api = {
     login: (payload: { email: string; password: string }) =>
       apiFetch<BackendAuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify(payload) }),
     profile: () => apiFetch<BackendAuthUser>("/api/auth/profile", { method: "GET", auth: true }),
+
+    updateProfile: (payload: Partial<{ full_name: string; email: string; telephone: string }>) =>
+      apiFetch<{ message: string; user: BackendAuthUser }>("/api/auth/profile", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    changePassword: (payload: { current_password: string; new_password: string; confirm_password: string }) =>
+      apiFetch<{ message: string }>("/api/auth/change-password", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    forgotPassword: (email: string) =>
+      apiFetch<{ message: string; reset_url?: string; token?: string }>("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+
+    resetPassword: (payload: { token: string; new_password: string; confirm_password: string }) =>
+      apiFetch<{ message: string }>("/api/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
   },
 
   households: {
@@ -254,6 +308,11 @@ export const api = {
       notes?: string;
     }) => apiFetch("/api/households", { method: "POST", body: JSON.stringify(payload), auth: true }),
     me: () => apiFetch("/api/households/me", { method: "GET", auth: true }),
+
+    update: (payload: Partial<{
+      district: string; sector: string; cell: string; village: string;
+      street_address: string; house_type: string; residents: number; notes: string;
+    }>) => apiFetch("/api/households/me", { method: "PUT", body: JSON.stringify(payload), auth: true }),
   },
 
   companies: {
@@ -419,6 +478,31 @@ export const api = {
       }),
   },
 
+  chat: {
+    list: (companyId: number) =>
+      apiFetch<{ messages: BackendChatMessage[] }>(`/api/chat/company/${companyId}`, { method: "GET", auth: true }),
+
+    send: (companyId: number, message: string, senderName?: string) =>
+      apiFetch<{ message: string; chat: BackendChatMessage }>(`/api/chat/company/${companyId}`, {
+        method: "POST",
+        body: JSON.stringify({ message, sender_name: senderName }),
+        auth: true,
+      }),
+
+    edit: (companyId: number, messageId: number, message: string) =>
+      apiFetch<{ message: string; chat: BackendChatMessage }>(`/api/chat/company/${companyId}/${messageId}`, {
+        method: "PUT",
+        body: JSON.stringify({ message }),
+        auth: true,
+      }),
+
+    remove: (companyId: number, messageId: number) =>
+      apiFetch<{ message: string }>(`/api/chat/company/${companyId}/${messageId}`, {
+        method: "DELETE",
+        auth: true,
+      }),
+  },
+
   companySchedules: {
     list: (companyId: number) =>
       apiFetch<{ schedules: BackendCompanySchedule[] }>(`/api/company-schedules/company/${companyId}`, {
@@ -453,6 +537,40 @@ export const api = {
     remove: (companyId: number, scheduleId: number) =>
       apiFetch<{ message: string }>(`/api/company-schedules/company/${companyId}/${scheduleId}`, {
         method: "DELETE",
+        auth: true,
+      }),
+  },
+
+  complaints: {
+    submit: (payload: { issue_type: string; description: string; priority?: string }) =>
+      apiFetch<{ message: string; complaint: BackendComplaint }>("/api/complaints", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    me: () =>
+      apiFetch<BackendComplaint[]>("/api/complaints/me", { method: "GET", auth: true }),
+
+    all: () =>
+      apiFetch<BackendComplaint[]>("/api/complaints", { method: "GET", auth: true }),
+
+    updateStatus: (
+      id: number,
+      payload: { status: "Pending" | "In Progress" | "Resolved"; assigned_to?: string; resolution_note?: string },
+    ) =>
+      apiFetch<{ message: string; complaint: BackendComplaint }>(`/api/complaints/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    remove: (id: number) =>
+      apiFetch<{ message: string }>(`/api/complaints/${id}`, { method: "DELETE", auth: true }),
+
+    byDistrict: (district: string) =>
+      apiFetch<BackendComplaint[]>(`/api/complaints/district/${encodeURIComponent(district)}`, {
+        method: "GET",
         auth: true,
       }),
   },

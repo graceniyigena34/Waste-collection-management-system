@@ -7,8 +7,9 @@ import {
   Car, ShieldCheck, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
   Clock, AlertTriangle, Bell, Plus,
-  CalendarDays, CheckCircle2, Edit3, Trash2, X,
+  CalendarDays, CheckCircle2, Edit3, Trash2, X, MessageSquare, Eye,
 } from "lucide-react";
+import { type BackendComplaint } from "@/lib/api-client";
 import { isWasteCollectorRole } from "@/lib/company-application";
 import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
@@ -76,6 +77,11 @@ export default function WasteCompanyDashboard() {
   });
   const [scheduleView, setScheduleView] = useState<"week" | "list">("week");
   const [activeSection, setActiveSection] = useState<string>("top-section");
+
+  const [complaints, setComplaints] = useState<BackendComplaint[]>([]);
+  const [complaintsLoading, setComplaintsLoading] = useState(false);
+  const [complaintsError, setComplaintsError] = useState("");
+  const [viewedComplaint, setViewedComplaint] = useState<BackendComplaint | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -150,6 +156,23 @@ export default function WasteCompanyDashboard() {
 
     void loadSchedules();
   }, [application, companyDistrict?.id, companyDistrict?.name]);
+
+  useEffect(() => {
+    if (!application?.district) return;
+    const loadComplaints = async () => {
+      setComplaintsLoading(true);
+      setComplaintsError("");
+      try {
+        const data = await api.complaints.byDistrict(application.district!);
+        setComplaints(data);
+      } catch (err) {
+        setComplaintsError(err instanceof Error ? err.message : "Failed to load complaints.");
+      } finally {
+        setComplaintsLoading(false);
+      }
+    };
+    void loadComplaints();
+  }, [application?.district]);
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
@@ -342,6 +365,7 @@ export default function WasteCompanyDashboard() {
     { label: "Vehicles", icon: Car, color: "text-purple-600 bg-purple-50 hover:bg-purple-100", target: "vehicles-section" },
     { label: "Assignment", icon: Route, color: "text-teal-600 bg-teal-50 hover:bg-teal-100", target: "assignment-section" },
     { label: "Schedule", icon: CalendarDays, color: "text-green-700 bg-green-50 hover:bg-green-100", target: "schedule-section" },
+    { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
     { label: "Documents", icon: FileText, color: "text-orange-600 bg-orange-50 hover:bg-orange-100", target: "documents-section" },
     { label: "Overview", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
   ];
@@ -462,6 +486,7 @@ export default function WasteCompanyDashboard() {
             { label: "Vehicles", icon: Car, target: "vehicles-section" },
             { label: "Assignment", icon: Route, target: "assignment-section" },
             { label: "Schedule", icon: CalendarDays, target: "schedule-section" },
+            { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
             { label: "Documents", icon: FileText, target: "documents-section" },
             { label: "Overview", icon: Building2, target: "overview-section" },
             { label: "Settings", icon: Settings, target: "top-section" },
@@ -735,22 +760,33 @@ export default function WasteCompanyDashboard() {
             </Card>
 
             <Card title="Recent Complaints" icon={<AlertTriangle size={16} className="text-orange-500" />}>
-              <div className="space-y-4">
-                {[
-                  { title: "Missing pickup follow-up", desc: "Gasabo zone complaint assigned to operations", time: "10 min ago", dot: "bg-red-500" },
-                  { title: "Driver schedule updated", desc: "Route review completed for tomorrow's shift", time: "2 hrs ago", dot: "bg-blue-500" },
-                  { title: "Monthly billing cleared", desc: "45 households confirmed paid", time: "5 hrs ago", dot: "bg-green-500" },
-                ].map((item, index) => (
-                  <div key={index} className="flex items-start gap-3">
-                    <div className={`w-2.5 h-2.5 ${item.dot} rounded-full mt-1.5 flex-shrink-0`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-800">{item.title}</p>
-                      <p className="text-xs text-gray-500 truncate">{item.desc}</p>
+              {complaintsLoading ? (
+                <div className="flex justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-green-600" />
+                </div>
+              ) : complaintsError ? (
+                <p className="text-sm text-red-500">{complaintsError}</p>
+              ) : complaints.length === 0 ? (
+                <p className="text-sm text-gray-400">No complaints in your district yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {complaints.slice(0, 4).map((c) => (
+                    <div key={c.id} className="flex items-start gap-3">
+                      <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${c.status === "Resolved" ? "bg-green-500" : c.status === "In Progress" ? "bg-blue-500" : "bg-red-500"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800">{c.issue_type}</p>
+                        <p className="text-xs text-gray-500 truncate">{c.full_name ?? "Unknown"} — {c.description}</p>
+                      </div>
+                      <span className={`text-xs font-medium flex-shrink-0 ${c.status === "Resolved" ? "text-green-600" : c.status === "In Progress" ? "text-blue-600" : "text-orange-600"}`}>{c.status}</span>
                     </div>
-                    <span className="text-xs text-gray-400 flex-shrink-0">{item.time}</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                  {complaints.length > 4 && (
+                    <button onClick={() => scrollToSection("complaints-section")} className="text-xs text-green-700 underline">
+                      View all {complaints.length} complaints →
+                    </button>
+                  )}
+                </div>
+              )}
             </Card>
             </div>
 
@@ -963,6 +999,127 @@ export default function WasteCompanyDashboard() {
               )}
             </Card>
             </div>
+
+          {/* ── Complaints Section ── */}
+          <div className={`scroll-mt-28 ${activeSection !== "top-section" && activeSection !== "complaints-section" ? "hidden" : ""}`} id="complaints-section">
+            <Card title={`Complaints — ${companyDistrict?.name || application.district || "Your District"}`} icon={<MessageSquare size={16} className="text-red-500" />}>
+              {/* Stats row */}
+              <div className="grid grid-cols-3 gap-3 mb-2">
+                {[
+                  { label: "Total", value: complaints.length, color: "text-blue-600 bg-blue-50" },
+                  { label: "Pending", value: complaints.filter(c => c.status === "Pending").length, color: "text-orange-600 bg-orange-50" },
+                  { label: "Resolved", value: complaints.filter(c => c.status === "Resolved").length, color: "text-green-600 bg-green-50" },
+                ].map(s => (
+                  <div key={s.label} className={`${s.color} rounded-xl p-3 text-center`}>
+                    <p className="text-xl font-bold">{s.value}</p>
+                    <p className="text-xs">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {complaintsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-green-600" />
+                </div>
+              ) : complaintsError ? (
+                <div className="text-center py-6">
+                  <p className="text-sm text-red-500 mb-2">{complaintsError}</p>
+                </div>
+              ) : !application.district ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Set your working district above to see complaints from households in your area.
+                </div>
+              ) : complaints.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
+                  <MessageSquare size={32} className="mx-auto mb-2 opacity-30" />
+                  No complaints found for {companyDistrict?.name || application.district}.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {complaints.map(c => (
+                    <div key={c.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <span className="font-mono text-xs text-gray-400">#{c.id}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              c.priority === "Urgent" ? "bg-red-100 text-red-700" :
+                              c.priority === "High" ? "bg-orange-100 text-orange-700" :
+                              c.priority === "Medium" ? "bg-yellow-100 text-yellow-700" :
+                              "bg-green-100 text-green-700"
+                            }`}>{c.priority}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              c.status === "Resolved" ? "bg-green-100 text-green-700" :
+                              c.status === "In Progress" ? "bg-blue-100 text-blue-700" :
+                              "bg-yellow-100 text-yellow-700"
+                            }`}>{c.status}</span>
+                          </div>
+                          <p className="font-semibold text-gray-900 text-sm">{c.issue_type}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">{c.full_name ?? "Unknown"} • {c.zone ?? "—"}</p>
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2">{c.description}</p>
+                          {c.assigned_to && (
+                            <p className="text-xs text-green-700 mt-1">Assigned: {c.assigned_to}</p>
+                          )}
+                          {c.resolution_note && (
+                            <p className="text-xs text-blue-700 mt-1 bg-blue-50 rounded px-2 py-1">Note: {c.resolution_note}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setViewedComplaint(c)}
+                          className="flex-shrink-0 px-3 py-1.5 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-50 transition flex items-center gap-1"
+                        >
+                          <Eye size={12} /> View
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Complaint detail modal */}
+          {viewedComplaint && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b">
+                  <h3 className="font-bold text-gray-800">Complaint Details</h3>
+                  <button onClick={() => setViewedComplaint(null)}><X size={20} className="text-gray-400" /></button>
+                </div>
+                <div className="p-6 space-y-3">
+                  {([
+                    ["ID", `#${viewedComplaint.id}`],
+                    ["Household", viewedComplaint.full_name ?? "—"],
+                    ["Zone", viewedComplaint.zone ?? "—"],
+                    ["Issue", viewedComplaint.issue_type],
+                    ["Priority", viewedComplaint.priority],
+                    ["Status", viewedComplaint.status],
+                    ["Assigned To", viewedComplaint.assigned_to ?? "Unassigned"],
+                  ] as [string, string][]).map(([k, v]) => (
+                    <div key={k} className="flex justify-between text-sm">
+                      <span className="text-gray-500">{k}</span>
+                      <span className="font-medium text-gray-800">{v}</span>
+                    </div>
+                  ))}
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Description</p>
+                    <p className="text-sm text-gray-800 bg-gray-50 rounded-lg p-3">{viewedComplaint.description}</p>
+                  </div>
+                  {viewedComplaint.resolution_note && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Resolution Note</p>
+                      <p className="text-sm text-gray-800 bg-green-50 rounded-lg p-3">{viewedComplaint.resolution_note}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="px-6 pb-6">
+                  <button onClick={() => setViewedComplaint(null)} className="w-full py-2 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition">
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {scheduleModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6">
