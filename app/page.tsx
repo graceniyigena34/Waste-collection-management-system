@@ -1,9 +1,10 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import HomeSection from "@/components/HomeSection";
 import AboutSection from "@/components/AboutSection";
 import Servicepage from "@/components/Servicepage";
+import ContactSection from "@/components/ContactSection";
 import Footer from "@/components/Footer";
 
 
@@ -13,7 +14,7 @@ export default function Home() {
 
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ["home", "about", "services"];
+      const sections = ["home", "about", "services", "contact"];
       const currentSection = sections.find(section => {
         const element = document.getElementById(section);
         if (element) {
@@ -55,6 +56,7 @@ export default function Home() {
         <HomeSection />
         <AboutSection />
         <Servicepage />
+        <ContactSection />
       </main>
       <Footer />
     </div>
