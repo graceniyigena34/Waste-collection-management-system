@@ -129,6 +129,16 @@ export interface BackendComplaint {
   zone?: string;
 }
 
+export interface BackendNotification {
+  id: number;
+  user_id: number;
+  title: string;
+  message: string;
+  type: "info" | "warning" | "success";
+  read: boolean;
+  created_at?: string;
+}
+
 export interface BackendCompanySchedule {
   id: number;
   company_id: number;
@@ -602,6 +612,13 @@ export const api = {
         method: "GET",
         auth: true,
       }),
+  },
+
+  notifications: {
+    list: () => apiFetch<BackendNotification[]>("/api/notifications", { method: "GET", auth: true }),
+    markRead: (id: number) => apiFetch<{ message: string }>(`/api/notifications/${id}/read`, { method: "PATCH", auth: true }),
+    markAllRead: () => apiFetch<{ message: string }>("/api/notifications/read-all", { method: "PATCH", auth: true }),
+    remove: (id: number) => apiFetch<{ message: string }>(`/api/notifications/${id}`, { method: "DELETE", auth: true }),
   },
 };
 

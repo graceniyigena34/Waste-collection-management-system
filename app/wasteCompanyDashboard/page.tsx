@@ -12,6 +12,7 @@ import {
 import { type BackendComplaint, type BackendChatMessage, type BackendConversationSummary } from "@/lib/api-client";
 import { isWasteCollectorRole } from "@/lib/company-application";
 import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
+import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
@@ -669,9 +670,12 @@ export default function WasteCompanyDashboard() {
               </div>
             </div>
           </div>
-          <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition">
-            <LogOut size={15} /> Logout
-          </button>
+          <div className="flex items-center gap-3">
+            <NotificationBell mode="dropdown" buttonClassName="text-gray-600 hover:bg-gray-100" />
+            <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition">
+              <LogOut size={15} /> Logout
+            </button>
+          </div>
         </header>
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-6" id="top-section">
