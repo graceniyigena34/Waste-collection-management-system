@@ -1222,6 +1222,16 @@ export default function WasteCompanyDashboard() {
                               <MessageSquare size={12} /> Respond
                             </button>
                           )}
+                          <button
+                            onClick={async () => {
+                              setComplaints(prev => prev.filter(x => x.id !== c.id));
+                              try { await api.complaints.remove(c.id); }
+                              catch { setComplaints(prev => [c, ...prev].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())); }
+                            }}
+                            className="px-3 py-1.5 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-50 transition flex items-center gap-1"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
                         </div>
                       </div>
                     </div>

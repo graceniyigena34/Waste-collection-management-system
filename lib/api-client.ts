@@ -587,6 +587,13 @@ export const api = {
         auth: true,
       }),
 
+    editMine: (id: number, payload: { issue_type?: string; description?: string; priority?: string }) =>
+      apiFetch<{ message: string; complaint: BackendComplaint }>(`/api/complaints/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
     remove: (id: number) =>
       apiFetch<{ message: string }>(`/api/complaints/${id}`, { method: "DELETE", auth: true }),
 
