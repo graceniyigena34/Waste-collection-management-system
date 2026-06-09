@@ -82,6 +82,11 @@ export default function WasteCompanyDashboard() {
   const [complaintsLoading, setComplaintsLoading] = useState(false);
   const [complaintsError, setComplaintsError] = useState("");
   const [viewedComplaint, setViewedComplaint] = useState<BackendComplaint | null>(null);
+  const [respondTarget, setRespondTarget] = useState<BackendComplaint | null>(null);
+  const [respondNote, setRespondNote] = useState("");
+  const [respondStatus, setRespondStatus] = useState<"In Progress" | "Resolved">("In Progress");
+  const [respondSaving, setRespondSaving] = useState(false);
+  const [respondError, setRespondError] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -173,6 +178,29 @@ export default function WasteCompanyDashboard() {
     };
     void loadComplaints();
   }, [application?.district]);
+
+  const handleRespond = async () => {
+    if (!respondTarget || !respondNote.trim()) {
+      setRespondError("Please enter a response note.");
+      return;
+    }
+    setRespondSaving(true);
+    setRespondError("");
+    try {
+      const res = await api.complaints.updateStatus(respondTarget.id, {
+        status: respondStatus,
+        resolution_note: respondNote.trim(),
+      });
+      setComplaints(prev => prev.map(c => c.id === respondTarget.id ? res.complaint : c));
+      setRespondTarget(null);
+      setRespondNote("");
+      setRespondStatus("In Progress");
+    } catch (err) {
+      setRespondError(err instanceof Error ? err.message : "Failed to send response.");
+    } finally {
+      setRespondSaving(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("auth_token");
@@ -1064,12 +1092,22 @@ export default function WasteCompanyDashboard() {
                             <p className="text-xs text-blue-700 mt-1 bg-blue-50 rounded px-2 py-1">Note: {c.resolution_note}</p>
                           )}
                         </div>
-                        <button
-                          onClick={() => setViewedComplaint(c)}
-                          className="flex-shrink-0 px-3 py-1.5 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-50 transition flex items-center gap-1"
-                        >
-                          <Eye size={12} /> View
-                        </button>
+                        <div className="flex flex-col gap-2 flex-shrink-0">
+                          <button
+                            onClick={() => setViewedComplaint(c)}
+                            className="px-3 py-1.5 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-50 transition flex items-center gap-1"
+                          >
+                            <Eye size={12} /> View
+                          </button>
+                          {c.status !== "Resolved" && (
+                            <button
+                              onClick={() => { setRespondTarget(c); setRespondNote(c.resolution_note ?? ""); setRespondStatus("In Progress"); setRespondError(""); }}
+                              className="px-3 py-1.5 text-green-700 border border-green-200 rounded-lg text-xs font-medium hover:bg-green-50 transition flex items-center gap-1"
+                            >
+                              <MessageSquare size={12} /> Respond
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1116,6 +1154,75 @@ export default function WasteCompanyDashboard() {
                   <button onClick={() => setViewedComplaint(null)} className="w-full py-2 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition">
                     Close
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Respond to complaint modal */}
+          {respondTarget && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b">
+                  <h3 className="font-bold text-gray-800">Respond to Complaint</h3>
+                  <button onClick={() => setRespondTarget(null)} disabled={respondSaving}>
+                    <X size={20} className="text-gray-400" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="font-medium text-gray-800 text-sm">{respondTarget.issue_type}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{respondTarget.full_name ?? "—"} • {respondTarget.zone ?? "—"}</p>
+                    <p className="text-xs text-gray-600 mt-1">{respondTarget.description}</p>
+                  </div>
+
+                  {respondError && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 rounded-xl">
+                      {respondError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Update Status</label>
+                    <select
+                      value={respondStatus}
+                      onChange={e => setRespondStatus(e.target.value as "In Progress" | "Resolved")}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Resolved</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Response / Resolution Note <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={respondNote}
+                      onChange={e => setRespondNote(e.target.value)}
+                      rows={4}
+                      placeholder="Explain what action was taken or what the citizen should expect..."
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setRespondTarget(null)}
+                      disabled={respondSaving}
+                      className="flex-1 py-2 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleRespond}
+                      disabled={respondSaving}
+                      className="flex-1 py-2 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {respondSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> Sending…</> : "Send Response"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
