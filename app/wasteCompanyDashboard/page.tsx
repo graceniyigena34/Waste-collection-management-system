@@ -7,7 +7,7 @@ import {
   Car, ShieldCheck, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
   Clock, AlertTriangle, Bell, Plus,
-  CalendarDays, CheckCircle2, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
+  CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
 } from "lucide-react";
 import { type BackendComplaint, type BackendChatMessage, type BackendConversationSummary } from "@/lib/api-client";
 import { isWasteCollectorRole } from "@/lib/company-application";
@@ -97,6 +97,8 @@ export default function WasteCompanyDashboard() {
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState("");
   const [chatHoveredMsgId, setChatHoveredMsgId] = useState<number | null>(null);
+  const [chatEditingId, setChatEditingId] = useState<number | null>(null);
+  const [chatEditText, setChatEditText] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -276,17 +278,40 @@ export default function WasteCompanyDashboard() {
 
   const handleDeleteChatMessage = async (msg: BackendChatMessage) => {
     if (!application) return;
-    // Optimistic remove
     setChatMessages(prev => prev.filter(m => m.id !== msg.id));
     try {
       await api.chat.remove(application.id, msg.id);
     } catch {
-      // Rollback on failure
       setChatMessages(prev =>
         [...prev, msg].sort((a, b) =>
           new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
         )
       );
+    }
+  };
+
+  const startChatEdit = (msg: BackendChatMessage) => {
+    setChatEditingId(msg.id);
+    setChatEditText(msg.message);
+  };
+
+  const cancelChatEdit = () => {
+    setChatEditingId(null);
+    setChatEditText("");
+  };
+
+  const saveChatEdit = async (msg: BackendChatMessage) => {
+    const text = chatEditText.trim();
+    if (!text || !application) return;
+    // Optimistic update
+    setChatMessages(prev => prev.map(m => m.id === msg.id ? { ...m, message: text } : m));
+    cancelChatEdit();
+    try {
+      const res = await api.chat.edit(application.id, msg.id, text);
+      setChatMessages(prev => prev.map(m => m.id === msg.id ? res.chat : m));
+    } catch {
+      // Rollback
+      setChatMessages(prev => prev.map(m => m.id === msg.id ? msg : m));
     }
   };
 
@@ -1298,6 +1323,7 @@ export default function WasteCompanyDashboard() {
                           chatMessages.map(msg => {
                             const isCompany = msg.sender_role === "company";
                             const isHovered = chatHoveredMsgId === msg.id;
+                            const isEditing = chatEditingId === msg.id;
                             return (
                               <div
                                 key={msg.id}
@@ -1305,24 +1331,66 @@ export default function WasteCompanyDashboard() {
                                 onMouseEnter={() => setChatHoveredMsgId(msg.id)}
                                 onMouseLeave={() => setChatHoveredMsgId(null)}
                               >
-                                {/* Delete button — left side for company messages, appears on hover */}
-                                {isCompany && (
-                                  <button
-                                    onClick={() => void handleDeleteChatMessage(msg)}
-                                    title="Delete message"
-                                    className={`p-1 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0 ${isHovered ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-                                  >
-                                    <Trash2 size={13} />
-                                  </button>
+                                {/* Edit + Delete toolbar — left of company bubble, appears on hover */}
+                                {isCompany && !isEditing && (
+                                  <div className={`flex gap-0.5 flex-shrink-0 transition-opacity ${isHovered ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                                    <button
+                                      onClick={() => startChatEdit(msg)}
+                                      title="Edit message"
+                                      className="p-1 rounded-lg text-gray-400 hover:text-green-700 hover:bg-green-50 transition"
+                                    >
+                                      <Edit3 size={13} />
+                                    </button>
+                                    <button
+                                      onClick={() => void handleDeleteChatMessage(msg)}
+                                      title="Delete message"
+                                      className="p-1 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
                                 )}
 
-                                <div className={`max-w-[78%] rounded-2xl px-4 py-2.5 ${isCompany ? "bg-green-700 text-white rounded-br-sm" : "bg-gray-100 text-gray-800 rounded-bl-sm"}`}>
-                                  <p className="text-sm leading-relaxed">{msg.message}</p>
-                                  <p className={`text-[11px] mt-1 ${isCompany ? "text-green-200" : "text-gray-400"}`}>
-                                    {msg.sender_name ?? (isCompany ? application.company_name : "Citizen")}
-                                    {msg.created_at ? ` · ${new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
-                                  </p>
-                                </div>
+                                {isEditing ? (
+                                  /* Inline edit mode */
+                                  <div className="flex flex-col gap-1 max-w-[78%]">
+                                    <textarea
+                                      value={chatEditText}
+                                      onChange={e => setChatEditText(e.target.value)}
+                                      onKeyDown={e => {
+                                        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void saveChatEdit(msg); }
+                                        if (e.key === "Escape") cancelChatEdit();
+                                      }}
+                                      autoFocus
+                                      rows={2}
+                                      className="w-full px-3 py-2 text-sm border border-green-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-200 resize-none"
+                                    />
+                                    <div className="flex gap-1 justify-end">
+                                      <button
+                                        onClick={() => void saveChatEdit(msg)}
+                                        title="Save"
+                                        className="p-1.5 bg-green-700 text-white rounded-lg hover:bg-green-800 transition"
+                                      >
+                                        <Check size={13} />
+                                      </button>
+                                      <button
+                                        onClick={cancelChatEdit}
+                                        title="Cancel"
+                                        className="p-1.5 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className={`max-w-[78%] rounded-2xl px-4 py-2.5 ${isCompany ? "bg-green-700 text-white rounded-br-sm" : "bg-gray-100 text-gray-800 rounded-bl-sm"}`}>
+                                    <p className="text-sm leading-relaxed">{msg.message}</p>
+                                    <p className={`text-[11px] mt-1 ${isCompany ? "text-green-200" : "text-gray-400"}`}>
+                                      {msg.sender_name ?? (isCompany ? application.company_name : "Citizen")}
+                                      {msg.created_at ? ` · ${new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             );
                           })
