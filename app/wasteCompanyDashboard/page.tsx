@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Building2, BadgeCheck, Users, FileText, MapPin,
-  Car, ShieldCheck, LogOut, Phone, Mail, User, Truck,
+  Building2, BadgeCheck, Users, MapPin,
+  Car, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
   Clock, AlertTriangle, Bell, Plus,
   CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
@@ -474,13 +474,8 @@ export default function WasteCompanyDashboard() {
   const mapped = {
     drivers: asArray(application.drivers) as Array<Record<string, string>>,
     cars: asArray(application.vehicles) as Array<Record<string, string>>,
-    certificates: asArray(application.certificates) as string[],
-    rdbCertificates: asArray(application.rdb_certificates) as string[],
-    taxCertificates: asArray(application.tax_certificates) as string[],
     serviceAreas: asArray(application.service_areas) as string[],
   };
-
-  const totalDocs = mapped.certificates.length + mapped.rdbCertificates.length + mapped.taxCertificates.length;
 
   const zoneProgress = mapped.serviceAreas.length > 0
     ? mapped.serviceAreas.map((zone, index) => ({
@@ -497,7 +492,6 @@ export default function WasteCompanyDashboard() {
 
   const activities = [
     { id: "1", title: "Drivers Updated", desc: `${mapped.drivers.length} drivers available for dispatch`, time: "10 min ago", dot: "bg-green-500" },
-    { id: "2", title: "Documents Reviewed", desc: `${totalDocs} company documents are uploaded`, time: "2 hrs ago", dot: "bg-blue-500" },
     { id: "3", title: "Service Areas Set", desc: mapped.serviceAreas.join(", ") || "No zones selected", time: "5 hrs ago", dot: "bg-purple-500" },
     { id: "4", title: "Fleet Ready", desc: `${mapped.cars.length} vehicles are ready for operation`, time: "6 hrs ago", dot: "bg-orange-500" },
   ];
@@ -509,7 +503,6 @@ export default function WasteCompanyDashboard() {
     { label: "Schedule", icon: CalendarDays, color: "text-green-700 bg-green-50 hover:bg-green-100", target: "schedule-section" },
     { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
     { label: "Chat", icon: MessageCircle, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "chat-section" },
-    { label: "Documents", icon: FileText, color: "text-orange-600 bg-orange-50 hover:bg-orange-100", target: "documents-section" },
     { label: "Overview", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
   ];
 
@@ -631,7 +624,6 @@ export default function WasteCompanyDashboard() {
             { label: "Schedule", icon: CalendarDays, target: "schedule-section" },
             { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
             { label: "Chat", icon: MessageCircle, target: "chat-section" },
-            { label: "Documents", icon: FileText, target: "documents-section" },
             { label: "Overview", icon: Building2, target: "overview-section" },
             { label: "Settings", icon: Settings, target: "top-section" },
           ].map(({ label, icon: Icon, target }) => {
@@ -702,7 +694,7 @@ export default function WasteCompanyDashboard() {
             </div>
             <h1 className="text-3xl font-bold">{application.company_name}</h1>
             <p className="mt-2 text-green-100 text-sm max-w-2xl">
-              Your company profile has been approved. Use this dashboard to manage drivers, vehicles, documents, routes, and daily company activities.
+              Your company profile has been approved. Use this dashboard to manage drivers, vehicles, routes, and daily company activities.
             </p>
             <div className="mt-4 flex flex-wrap gap-4 text-sm text-green-200">
               <span className="flex items-center gap-1"><Mail size={13} /> {application.email}</span>
@@ -716,7 +708,6 @@ export default function WasteCompanyDashboard() {
             {[
               { label: "Total Drivers", value: mapped.drivers.length, sub: "Registered drivers", icon: <Users size={22} className="text-blue-600" />, iconBg: "bg-blue-100", valueColor: "text-blue-600", trend: "+12% this month" },
               { label: "Vehicles Ready", value: mapped.cars.length, sub: "Fleet available", icon: <Truck size={22} className="text-green-600" />, iconBg: "bg-green-100", valueColor: "text-green-600", trend: "+5% vs yesterday" },
-              { label: "Documents", value: totalDocs, sub: "Uploaded files", icon: <FileText size={22} className="text-purple-600" />, iconBg: "bg-purple-100", valueColor: "text-purple-600", trend: "+8% this month" },
               { label: "Service Areas", value: mapped.serviceAreas.length, sub: "Zones covered", icon: <MapPin size={22} className="text-orange-500" />, iconBg: "bg-orange-100", valueColor: "text-orange-500", trend: "Active" },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
@@ -832,8 +823,6 @@ export default function WasteCompanyDashboard() {
               <InfoRow label="Service areas" value={mapped.serviceAreas.join(", ") || "—"} />
               <InfoRow label="Drivers" value={String(mapped.drivers.length)} />
               <InfoRow label="Vehicles" value={String(mapped.cars.length)} />
-              <InfoRow label="Certificates" value={String(mapped.certificates.length)} />
-              <InfoRow label="Tax documents" value={String(mapped.taxCertificates.length)} />
               {application.description && (
                 <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600 mt-1">
                   {application.description}
@@ -879,7 +868,7 @@ export default function WasteCompanyDashboard() {
               </div>
               <div className="mt-4 rounded-2xl bg-gray-50 p-4">
                 <div className="flex items-center gap-2 font-semibold text-gray-800"><Bell size={16} className="text-green-600" /> Recent alerts</div>
-                <p className="mt-2 text-sm text-gray-500">You are fully approved. Keep drivers, vehicles, and documents updated to maintain active operations.</p>
+                <p className="mt-2 text-sm text-gray-500">You are fully approved. Keep drivers, vehicles, and service areas updated to maintain active operations.</p>
               </div>
             </Card>
             </div>
@@ -936,14 +925,6 @@ export default function WasteCompanyDashboard() {
               )}
             </Card>
             </div>
-
-          <Card title="Certificates & Documents" icon={<ShieldCheck size={16} className="text-orange-500" />}>
-            <div className={`grid gap-4 md:grid-cols-3 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'documents-section' ? 'hidden' : ''}`} id="documents-section">
-              <DocList label="Business Certificates" files={mapped.certificates} />
-              <DocList label="RDB Certificates" files={mapped.rdbCertificates} />
-              <DocList label="Tax Clearance" files={mapped.taxCertificates} />
-            </div>
-          </Card>
 
           <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'schedule-section' ? 'hidden' : ''}`} id="schedule-section">
             <Card title="Weekly District Scheduler" icon={<CalendarDays size={16} className="text-green-700" />}>
@@ -1714,21 +1695,3 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DocList({ label, files }: { label: string; files: string[] }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</p>
-      {files.length === 0 ? (
-        <p className="text-xs text-gray-400">None uploaded</p>
-      ) : (
-        <ul className="space-y-1">
-          {files.map((f, i) => (
-            <li key={i} className="flex items-center gap-2 text-xs text-gray-700 bg-gray-50 rounded-lg px-3 py-2">
-              <FileText size={12} className="text-gray-400 flex-shrink-0" /> {f}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
