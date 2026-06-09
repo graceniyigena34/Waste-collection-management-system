@@ -213,10 +213,11 @@ export default function WasteCompanyDashboard() {
 
   useEffect(() => {
     if (!application) return;
+    const appId = application.id;
     const load = async () => {
       setChatLoading(true);
       try {
-        const res = await api.chat.conversations(application.id);
+        const res = await api.chat.conversations(appId);
         setChatConversations(res.conversations);
       } catch {
         // silent
@@ -225,25 +226,32 @@ export default function WasteCompanyDashboard() {
       }
     };
     void load();
-  }, [application]);
+  }, [application?.id]);
 
   useEffect(() => {
     if (!application || !selectedCitizenId) return;
-    const load = async () => {
-      setChatMessagesLoading(true);
+    const appId = application.id;
+    let cancelled = false;
+
+    const load = async (showLoading: boolean) => {
+      if (showLoading) setChatMessagesLoading(true);
       try {
-        const res = await api.chat.listForCitizen(application.id, selectedCitizenId);
-        setChatMessages(res.messages);
+        const res = await api.chat.listForCitizen(appId, selectedCitizenId);
+        if (!cancelled) setChatMessages(res.messages);
       } catch {
         // silent
       } finally {
-        setChatMessagesLoading(false);
+        if (showLoading && !cancelled) setChatMessagesLoading(false);
       }
     };
-    void load();
-    const interval = setInterval(() => void load(), 5000);
-    return () => clearInterval(interval);
-  }, [application, selectedCitizenId]);
+
+    void load(true);
+    const interval = setInterval(() => void load(false), 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [application?.id, selectedCitizenId]);
 
   const handleChatReply = async () => {
     if (!application || !selectedCitizenId || !chatInput.trim()) return;
