@@ -7,9 +7,9 @@ import {
   Car, ShieldCheck, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
   Clock, AlertTriangle, Bell, Plus,
-  CalendarDays, CheckCircle2, Edit3, Trash2, X, MessageSquare, Eye,
+  CalendarDays, CheckCircle2, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
 } from "lucide-react";
-import { type BackendComplaint } from "@/lib/api-client";
+import { type BackendComplaint, type BackendChatMessage, type BackendConversationSummary } from "@/lib/api-client";
 import { isWasteCollectorRole } from "@/lib/company-application";
 import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
@@ -87,6 +87,15 @@ export default function WasteCompanyDashboard() {
   const [respondStatus, setRespondStatus] = useState<"In Progress" | "Resolved">("In Progress");
   const [respondSaving, setRespondSaving] = useState(false);
   const [respondError, setRespondError] = useState("");
+
+  const [chatConversations, setChatConversations] = useState<BackendConversationSummary[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [selectedCitizenId, setSelectedCitizenId] = useState<number | null>(null);
+  const [chatMessages, setChatMessages] = useState<BackendChatMessage[]>([]);
+  const [chatMessagesLoading, setChatMessagesLoading] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -199,6 +208,60 @@ export default function WasteCompanyDashboard() {
       setRespondError(err instanceof Error ? err.message : "Failed to send response.");
     } finally {
       setRespondSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!application) return;
+    const load = async () => {
+      setChatLoading(true);
+      try {
+        const res = await api.chat.conversations(application.id);
+        setChatConversations(res.conversations);
+      } catch {
+        // silent
+      } finally {
+        setChatLoading(false);
+      }
+    };
+    void load();
+  }, [application]);
+
+  useEffect(() => {
+    if (!application || !selectedCitizenId) return;
+    const load = async () => {
+      setChatMessagesLoading(true);
+      try {
+        const res = await api.chat.listForCitizen(application.id, selectedCitizenId);
+        setChatMessages(res.messages);
+      } catch {
+        // silent
+      } finally {
+        setChatMessagesLoading(false);
+      }
+    };
+    void load();
+    const interval = setInterval(() => void load(), 5000);
+    return () => clearInterval(interval);
+  }, [application, selectedCitizenId]);
+
+  const handleChatReply = async () => {
+    if (!application || !selectedCitizenId || !chatInput.trim()) return;
+    const msg = chatInput.trim();
+    setChatInput("");
+    setChatSending(true);
+    setChatError("");
+    try {
+      const res = await api.chat.reply(application.id, selectedCitizenId, msg, application.company_name);
+      setChatMessages(prev => [...prev, res.chat]);
+      // refresh conversations list so last_message updates
+      const updated = await api.chat.conversations(application.id);
+      setChatConversations(updated.conversations);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Failed to send message.");
+      setChatInput(msg);
+    } finally {
+      setChatSending(false);
     }
   };
 
@@ -394,6 +457,7 @@ export default function WasteCompanyDashboard() {
     { label: "Assignment", icon: Route, color: "text-teal-600 bg-teal-50 hover:bg-teal-100", target: "assignment-section" },
     { label: "Schedule", icon: CalendarDays, color: "text-green-700 bg-green-50 hover:bg-green-100", target: "schedule-section" },
     { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
+    { label: "Chat", icon: MessageCircle, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "chat-section" },
     { label: "Documents", icon: FileText, color: "text-orange-600 bg-orange-50 hover:bg-orange-100", target: "documents-section" },
     { label: "Overview", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
   ];
@@ -515,6 +579,7 @@ export default function WasteCompanyDashboard() {
             { label: "Assignment", icon: Route, target: "assignment-section" },
             { label: "Schedule", icon: CalendarDays, target: "schedule-section" },
             { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
+            { label: "Chat", icon: MessageCircle, target: "chat-section" },
             { label: "Documents", icon: FileText, target: "documents-section" },
             { label: "Overview", icon: Building2, target: "overview-section" },
             { label: "Settings", icon: Settings, target: "top-section" },
@@ -1113,6 +1178,139 @@ export default function WasteCompanyDashboard() {
                   ))}
                 </div>
               )}
+            </Card>
+          </div>
+
+          {/* ── Chat Section ── */}
+          <div className={`scroll-mt-28 ${activeSection !== "top-section" && activeSection !== "chat-section" ? "hidden" : ""}`} id="chat-section">
+            <Card title="Citizen Chat" icon={<MessageCircle size={16} className="text-blue-500" />}>
+              <div className="flex gap-0 h-[520px] -m-2">
+                {/* Left: conversation list */}
+                <div className="w-60 flex-shrink-0 flex flex-col border-r border-gray-100 p-2 pr-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Conversations</p>
+                    <button
+                      onClick={() => {
+                        if (!application) return;
+                        void api.chat.conversations(application.id).then(r => setChatConversations(r.conversations)).catch(() => undefined);
+                      }}
+                      className="text-xs text-green-700 hover:underline"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  {chatLoading ? (
+                    <div className="flex justify-center py-4">
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-green-600" />
+                    </div>
+                  ) : chatConversations.length === 0 ? (
+                    <div className="text-center py-6 text-gray-400">
+                      <MessageCircle size={28} className="mx-auto mb-2 opacity-25" />
+                      <p className="text-xs">No messages yet.<br />Citizens can message you from their dashboard.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 overflow-y-auto flex-1">
+                      {chatConversations.map(conv => (
+                        <button
+                          key={conv.citizen_user_id}
+                          onClick={() => { setSelectedCitizenId(conv.citizen_user_id); setChatMessages([]); setChatError(""); }}
+                          className={`w-full text-left p-3 rounded-xl transition ${selectedCitizenId === conv.citizen_user_id ? "bg-green-50 border border-green-200" : "hover:bg-gray-50 border border-transparent"}`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-xs flex-shrink-0">
+                              {conv.citizen_name[0]?.toUpperCase() ?? "C"}
+                            </div>
+                            <p className="text-sm font-medium text-gray-800 truncate">{conv.citizen_name}</p>
+                          </div>
+                          <p className="text-xs text-gray-500 truncate pl-9">{conv.last_message}</p>
+                          <p className="text-xs text-gray-400 pl-9 mt-0.5">
+                            {conv.last_at ? new Date(conv.last_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: message thread */}
+                <div className="flex-1 flex flex-col min-w-0 p-2 pl-4">
+                  {!selectedCitizenId ? (
+                    <div className="flex-1 flex items-center justify-center text-gray-400">
+                      <div className="text-center">
+                        <MessageCircle size={44} className="mx-auto mb-3 opacity-15" />
+                        <p className="text-sm">Select a conversation to view messages</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Header */}
+                      <div className="pb-3 mb-3 border-b border-gray-100 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-sm flex-shrink-0">
+                            {(chatConversations.find(c => c.citizen_user_id === selectedCitizenId)?.citizen_name ?? "C")[0]?.toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-gray-900 text-sm">
+                              {chatConversations.find(c => c.citizen_user_id === selectedCitizenId)?.citizen_name ?? `Citizen #${selectedCitizenId}`}
+                            </p>
+                            <p className="text-xs text-gray-400">Citizen</p>
+                          </div>
+                        </div>
+                        <button onClick={() => { setSelectedCitizenId(null); setChatMessages([]); }} className="text-gray-400 hover:text-gray-600 transition">
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {/* Messages */}
+                      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+                        {chatMessagesLoading && chatMessages.length === 0 ? (
+                          <div className="flex justify-center py-4">
+                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-green-600" />
+                          </div>
+                        ) : chatMessages.length === 0 ? (
+                          <p className="text-sm text-gray-400 text-center py-4">No messages yet. Send the first reply.</p>
+                        ) : (
+                          chatMessages.map(msg => {
+                            const isCompany = msg.sender_role === "company";
+                            return (
+                              <div key={msg.id} className={`flex ${isCompany ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[78%] rounded-2xl px-4 py-2.5 ${isCompany ? "bg-green-700 text-white rounded-br-sm" : "bg-gray-100 text-gray-800 rounded-bl-sm"}`}>
+                                  <p className="text-sm leading-relaxed">{msg.message}</p>
+                                  <p className={`text-[11px] mt-1 ${isCompany ? "text-green-200" : "text-gray-400"}`}>
+                                    {msg.sender_name ?? (isCompany ? application.company_name : "Citizen")}
+                                    {msg.created_at ? ` · ${new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Reply input */}
+                      {chatError && <p className="text-xs text-red-500 mt-1">{chatError}</p>}
+                      <div className="mt-3 flex gap-2">
+                        <input
+                          value={chatInput}
+                          onChange={e => setChatInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleChatReply(); } }}
+                          placeholder="Type a reply and press Enter…"
+                          disabled={chatSending}
+                          className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-60"
+                        />
+                        <button
+                          onClick={() => void handleChatReply()}
+                          disabled={chatSending || !chatInput.trim()}
+                          className="rounded-xl bg-green-700 px-4 py-2.5 text-white hover:bg-green-800 transition disabled:opacity-50 flex items-center gap-1.5 text-sm font-semibold flex-shrink-0"
+                        >
+                          {chatSending ? <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> : <Send size={15} />}
+                          Send
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </Card>
           </div>
 

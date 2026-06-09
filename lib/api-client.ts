@@ -95,10 +95,19 @@ export interface BackendCompanyProfile {
 export interface BackendChatMessage {
   id: number;
   company_id: number;
+  user_id?: number;
+  citizen_user_id?: number;
   sender_role: "citizen" | "company";
   sender_name?: string;
   message: string;
   created_at?: string;
+}
+
+export interface BackendConversationSummary {
+  citizen_user_id: number;
+  citizen_name: string;
+  last_message: string;
+  last_at: string;
 }
 
 export interface BackendComplaint {
@@ -481,6 +490,19 @@ export const api = {
   chat: {
     list: (companyId: number) =>
       apiFetch<{ messages: BackendChatMessage[] }>(`/api/chat/company/${companyId}`, { method: "GET", auth: true }),
+
+    conversations: (companyId: number) =>
+      apiFetch<{ conversations: BackendConversationSummary[] }>(`/api/chat/company/${companyId}/conversations`, { method: "GET", auth: true }),
+
+    listForCitizen: (companyId: number, citizenUserId: number) =>
+      apiFetch<{ messages: BackendChatMessage[] }>(`/api/chat/company/${companyId}?citizen_user_id=${citizenUserId}`, { method: "GET", auth: true }),
+
+    reply: (companyId: number, citizenUserId: number, message: string, senderName?: string) =>
+      apiFetch<{ message: string; chat: BackendChatMessage }>(`/api/chat/company/${companyId}/reply/${citizenUserId}`, {
+        method: "POST",
+        body: JSON.stringify({ message, sender_name: senderName }),
+        auth: true,
+      }),
 
     send: (companyId: number, message: string, senderName?: string) =>
       apiFetch<{ message: string; chat: BackendChatMessage }>(`/api/chat/company/${companyId}`, {
