@@ -96,6 +96,7 @@ export default function WasteCompanyDashboard() {
   const [chatInput, setChatInput] = useState("");
   const [chatSending, setChatSending] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [chatHoveredMsgId, setChatHoveredMsgId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -270,6 +271,22 @@ export default function WasteCompanyDashboard() {
       setChatInput(msg);
     } finally {
       setChatSending(false);
+    }
+  };
+
+  const handleDeleteChatMessage = async (msg: BackendChatMessage) => {
+    if (!application) return;
+    // Optimistic remove
+    setChatMessages(prev => prev.filter(m => m.id !== msg.id));
+    try {
+      await api.chat.remove(application.id, msg.id);
+    } catch {
+      // Rollback on failure
+      setChatMessages(prev =>
+        [...prev, msg].sort((a, b) =>
+          new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime()
+        )
+      );
     }
   };
 
@@ -1280,8 +1297,25 @@ export default function WasteCompanyDashboard() {
                         ) : (
                           chatMessages.map(msg => {
                             const isCompany = msg.sender_role === "company";
+                            const isHovered = chatHoveredMsgId === msg.id;
                             return (
-                              <div key={msg.id} className={`flex ${isCompany ? "justify-end" : "justify-start"}`}>
+                              <div
+                                key={msg.id}
+                                className={`flex items-end gap-1 ${isCompany ? "justify-end" : "justify-start"}`}
+                                onMouseEnter={() => setChatHoveredMsgId(msg.id)}
+                                onMouseLeave={() => setChatHoveredMsgId(null)}
+                              >
+                                {/* Delete button — left side for company messages, appears on hover */}
+                                {isCompany && (
+                                  <button
+                                    onClick={() => void handleDeleteChatMessage(msg)}
+                                    title="Delete message"
+                                    className={`p-1 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition flex-shrink-0 ${isHovered ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+
                                 <div className={`max-w-[78%] rounded-2xl px-4 py-2.5 ${isCompany ? "bg-green-700 text-white rounded-br-sm" : "bg-gray-100 text-gray-800 rounded-bl-sm"}`}>
                                   <p className="text-sm leading-relaxed">{msg.message}</p>
                                   <p className={`text-[11px] mt-1 ${isCompany ? "text-green-200" : "text-gray-400"}`}>
