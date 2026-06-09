@@ -101,6 +101,25 @@ export interface BackendChatMessage {
   created_at?: string;
 }
 
+export interface BackendComplaint {
+  id: number;
+  user_id: number;
+  household_id?: number;
+  issue_type: string;
+  title: string;
+  description: string;
+  priority: "Low" | "Medium" | "High" | "Urgent";
+  status: "Pending" | "In Progress" | "Resolved";
+  assigned_to?: string;
+  resolution_note?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Admin-only fields (from JOIN)
+  full_name?: string;
+  telephone?: string;
+  zone?: string;
+}
+
 export interface BackendCompanySchedule {
   id: number;
   company_id: number;
@@ -520,6 +539,34 @@ export const api = {
         method: "DELETE",
         auth: true,
       }),
+  },
+
+  complaints: {
+    submit: (payload: { issue_type: string; description: string; priority?: string }) =>
+      apiFetch<{ message: string; complaint: BackendComplaint }>("/api/complaints", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    me: () =>
+      apiFetch<BackendComplaint[]>("/api/complaints/me", { method: "GET", auth: true }),
+
+    all: () =>
+      apiFetch<BackendComplaint[]>("/api/complaints", { method: "GET", auth: true }),
+
+    updateStatus: (
+      id: number,
+      payload: { status: "Pending" | "In Progress" | "Resolved"; assigned_to?: string; resolution_note?: string },
+    ) =>
+      apiFetch<{ message: string; complaint: BackendComplaint }>(`/api/complaints/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
+    remove: (id: number) =>
+      apiFetch<{ message: string }>(`/api/complaints/${id}`, { method: "DELETE", auth: true }),
   },
 };
 
