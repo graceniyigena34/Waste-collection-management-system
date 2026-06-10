@@ -42,14 +42,6 @@ const ContactSection: React.FC = () => {
     },
   ];
 
-  const fadeUp = {
-    hidden: { opacity: 0, y: 40 },
-    visible: (i: number) => ({
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5, delay: i * 0.1, ease: "easeOut" },
-    }),
-  };
 
   return (
     <section
@@ -83,11 +75,10 @@ const ContactSection: React.FC = () => {
               <motion.div
                 key={item.label}
                 className="flex items-start gap-4 p-5 bg-gray-50 dark:bg-gray-800 rounded-2xl"
-                custom={i}
-                variants={fadeUp}
-                initial="hidden"
-                whileInView="visible"
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
               >
                 <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-xl flex items-center justify-center flex-shrink-0">
                   {item.icon}
