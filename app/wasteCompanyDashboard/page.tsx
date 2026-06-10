@@ -102,6 +102,11 @@ export default function WasteCompanyDashboard() {
   const [chatEditingId, setChatEditingId] = useState<number | null>(null);
   const [chatEditText, setChatEditText] = useState("");
 
+  const [addDriverModal, setAddDriverModal] = useState(false);
+  const [addDriverForm, setAddDriverForm] = useState({ name: "", phone: "", email: "", licenseNumber: "", nationalId: "", zone: "Kicukiro", yearsOfExperience: "" });
+  const [addDriverSaving, setAddDriverSaving] = useState(false);
+  const [addDriverError, setAddDriverError] = useState("");
+
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token || !userInfo || !isWasteCollectorRole(userInfo.role)) {
@@ -454,6 +459,35 @@ export default function WasteCompanyDashboard() {
     } catch (error) {
       setScheduleTasks((current) => current.map((t) => (t.id === taskId ? { ...t, published: !publish } : t)));
       setScheduleMessage(error instanceof Error ? error.message : "Failed to update publish status.");
+    }
+  };
+
+  const handleAddDriver = async () => {
+    if (!application) return;
+    if (!addDriverForm.name.trim() || !addDriverForm.phone.trim()) {
+      setAddDriverError("Name and phone are required.");
+      return;
+    }
+    setAddDriverSaving(true);
+    setAddDriverError("");
+    try {
+      const res = await api.drivers.add(application.id, {
+        name: addDriverForm.name.trim(),
+        phone: addDriverForm.phone.trim(),
+        email: addDriverForm.email.trim() || undefined,
+        license_number: addDriverForm.licenseNumber.trim() || undefined,
+        national_id: addDriverForm.nationalId.trim() || undefined,
+        zone: addDriverForm.zone || undefined,
+        years_of_experience: addDriverForm.yearsOfExperience ? parseInt(addDriverForm.yearsOfExperience, 10) : undefined,
+      });
+      const updatedDrivers = [...(Array.isArray(application.drivers) ? application.drivers : []), res.driver];
+      setApplication({ ...application, drivers: updatedDrivers });
+      setAddDriverModal(false);
+      setAddDriverForm({ name: "", phone: "", email: "", licenseNumber: "", nationalId: "", zone: "Kicukiro", yearsOfExperience: "" });
+    } catch (err) {
+      setAddDriverError(err instanceof Error ? err.message : "Failed to add driver.");
+    } finally {
+      setAddDriverSaving(false);
     }
   };
 
@@ -868,7 +902,7 @@ export default function WasteCompanyDashboard() {
                 </div>
               )}
               <div className="pt-4 border-t border-gray-100 flex flex-wrap gap-3">
-                <button onClick={goToOnboarding} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition">
+                <button onClick={() => setAddDriverModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition">
                   <Plus size={15} /> Add driver
                 </button>
               </div>
@@ -1709,6 +1743,63 @@ export default function WasteCompanyDashboard() {
           )}
         </div>
       </main>
+
+      {addDriverModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="font-bold text-gray-900">Add Driver</h3>
+              <button onClick={() => { setAddDriverModal(false); setAddDriverError(""); }} className="rounded-lg p-1 hover:bg-gray-100 transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {addDriverError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{addDriverError}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+                  <input value={addDriverForm.name} onChange={(e) => setAddDriverForm((f) => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. Jean Baptiste" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone <span className="text-red-500">*</span></label>
+                  <input value={addDriverForm.phone} onChange={(e) => setAddDriverForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. 0788000000" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                  <input type="email" value={addDriverForm.email} onChange={(e) => setAddDriverForm((f) => ({ ...f, email: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="driver@email.com" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">License No.</label>
+                  <input value={addDriverForm.licenseNumber} onChange={(e) => setAddDriverForm((f) => ({ ...f, licenseNumber: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. RW-2024-001" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">National ID</label>
+                  <input value={addDriverForm.nationalId} onChange={(e) => setAddDriverForm((f) => ({ ...f, nationalId: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="16-digit ID" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Years of Experience</label>
+                  <input type="number" min="0" value={addDriverForm.yearsOfExperience} onChange={(e) => setAddDriverForm((f) => ({ ...f, yearsOfExperience: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. 3" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Zone</label>
+                  <select value={addDriverForm.zone} onChange={(e) => setAddDriverForm((f) => ({ ...f, zone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    {(mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera", "Bugesera", "Huye"]).map((z) => (
+                      <option key={z} value={z}>{z}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end border-t px-6 py-4">
+              <button onClick={() => { setAddDriverModal(false); setAddDriverError(""); }} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={handleAddDriver} disabled={addDriverSaving} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 transition disabled:opacity-60">
+                {addDriverSaving && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                {addDriverSaving ? "Saving..." : "Add Driver"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

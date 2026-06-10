@@ -139,6 +139,25 @@ export interface BackendNotification {
   created_at?: string;
 }
 
+export interface BackendDriver {
+  id: number;
+  company_id: number;
+  name: string;
+  phone: string;
+  email?: string;
+  license_number?: string;
+  national_id?: string;
+  years_of_experience?: number;
+  status?: string;
+  zone?: string;
+  truck_id?: string;
+  created_at?: string;
+}
+
+export interface BackendDriverWithCompany extends BackendDriver {
+  company_name?: string;
+}
+
 export interface BackendCompanySchedule {
   id: number;
   company_id: number;
@@ -632,6 +651,61 @@ export const api = {
     markRead: (id: number) => apiFetch<{ message: string }>(`/api/notifications/${id}/read`, { method: "PATCH", auth: true }),
     markAllRead: () => apiFetch<{ message: string }>("/api/notifications/read-all", { method: "PATCH", auth: true }),
     remove: (id: number) => apiFetch<{ message: string }>(`/api/notifications/${id}`, { method: "DELETE", auth: true }),
+  },
+
+  drivers: {
+    list: (companyId: number) =>
+      apiFetch<{ drivers: BackendDriver[] }>(`/api/drivers/company/${companyId}`, { method: "GET", auth: true }),
+
+    listAll: () =>
+      apiFetch<{ drivers: BackendDriverWithCompany[] }>("/api/drivers/all", { method: "GET", auth: true }),
+
+    add: (
+      companyId: number,
+      data: {
+        name: string;
+        phone: string;
+        email?: string;
+        license_number?: string;
+        national_id?: string;
+        years_of_experience?: number;
+        status?: string;
+        zone?: string;
+        truck_id?: string;
+      },
+    ) =>
+      apiFetch<{ message: string; driver: BackendDriver }>(`/api/drivers/company/${companyId}`, {
+        method: "POST",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    update: (
+      companyId: number,
+      driverId: number,
+      data: Partial<{
+        name: string;
+        phone: string;
+        email: string;
+        license_number: string;
+        national_id: string;
+        years_of_experience: number;
+        status: string;
+        zone: string;
+        truck_id: string;
+      }>,
+    ) =>
+      apiFetch<{ message: string; driver: BackendDriver }>(`/api/drivers/company/${companyId}/${driverId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    remove: (companyId: number, driverId: number) =>
+      apiFetch<{ message: string }>(`/api/drivers/company/${companyId}/${driverId}`, {
+        method: "DELETE",
+        auth: true,
+      }),
   },
 };
 
