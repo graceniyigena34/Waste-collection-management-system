@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Building2, BadgeCheck, Users, FileText, MapPin,
-  Car, ShieldCheck, LogOut, Phone, Mail, User, Truck,
+  Building2, BadgeCheck, Users, MapPin,
+  Car, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
   Clock, AlertTriangle, Bell, Plus,
   CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
@@ -12,6 +12,7 @@ import {
 import { type BackendComplaint, type BackendChatMessage, type BackendConversationSummary } from "@/lib/api-client";
 import { isWasteCollectorRole } from "@/lib/company-application";
 import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
+import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
@@ -34,6 +35,7 @@ interface ScheduleTask {
   startTime: string;
   wasteType: WasteType;
   status: TaskStatus;
+  published: boolean;
   notes: string;
 }
 
@@ -163,6 +165,7 @@ export default function WasteCompanyDashboard() {
           startTime: schedule.start_time || "08:00",
           wasteType: (schedule.waste_type as WasteType) || "General Waste",
           status: (schedule.status as TaskStatus) || "Scheduled",
+          published: schedule.published ?? false,
           notes: schedule.notes || "",
         }));
         setScheduleTasks(nextTasks);
@@ -363,6 +366,7 @@ export default function WasteCompanyDashboard() {
       startTime: scheduleForm.startTime,
       wasteType: scheduleForm.wasteType,
       status: editTask?.status ?? "Scheduled",
+      published: editTask?.published ?? false,
       notes: scheduleForm.notes.trim(),
     };
 
@@ -383,6 +387,7 @@ export default function WasteCompanyDashboard() {
           startTime: updated.schedule.start_time || nextTask.startTime,
           wasteType: (updated.schedule.waste_type as WasteType) || nextTask.wasteType,
           status: (updated.schedule.status as TaskStatus) || nextTask.status,
+          published: updated.schedule.published ?? nextTask.published,
           notes: updated.schedule.notes || nextTask.notes,
         };
         setScheduleTasks((current) => current.map((entry) => (entry.id === editTask.id ? saved : entry)));
@@ -402,6 +407,7 @@ export default function WasteCompanyDashboard() {
           startTime: created.schedule.start_time || nextTask.startTime,
           wasteType: (created.schedule.waste_type as WasteType) || nextTask.wasteType,
           status: (created.schedule.status as TaskStatus) || nextTask.status,
+          published: created.schedule.published ?? false,
           notes: created.schedule.notes || nextTask.notes,
         };
         setScheduleTasks((current) => [saved, ...current]);
@@ -439,6 +445,18 @@ export default function WasteCompanyDashboard() {
     }
   };
 
+  const handlePublishToggle = async (taskId: number, publish: boolean) => {
+    if (!application) return;
+    setScheduleTasks((current) => current.map((t) => (t.id === taskId ? { ...t, published: publish } : t)));
+    try {
+      await api.companySchedules.setPublished(application.id, taskId, publish);
+      setScheduleMessage(publish ? "Schedule published — citizens can now see it." : "Schedule unpublished.");
+    } catch (error) {
+      setScheduleTasks((current) => current.map((t) => (t.id === taskId ? { ...t, published: !publish } : t)));
+      setScheduleMessage(error instanceof Error ? error.message : "Failed to update publish status.");
+    }
+  };
+
   const handleDistrictSave = async () => {
     if (!application) return;
     if (!districtDraft.trim()) {
@@ -473,13 +491,8 @@ export default function WasteCompanyDashboard() {
   const mapped = {
     drivers: asArray(application.drivers) as Array<Record<string, string>>,
     cars: asArray(application.vehicles) as Array<Record<string, string>>,
-    certificates: asArray(application.certificates) as string[],
-    rdbCertificates: asArray(application.rdb_certificates) as string[],
-    taxCertificates: asArray(application.tax_certificates) as string[],
     serviceAreas: asArray(application.service_areas) as string[],
   };
-
-  const totalDocs = mapped.certificates.length + mapped.rdbCertificates.length + mapped.taxCertificates.length;
 
   const zoneProgress = mapped.serviceAreas.length > 0
     ? mapped.serviceAreas.map((zone, index) => ({
@@ -496,7 +509,6 @@ export default function WasteCompanyDashboard() {
 
   const activities = [
     { id: "1", title: "Drivers Updated", desc: `${mapped.drivers.length} drivers available for dispatch`, time: "10 min ago", dot: "bg-green-500" },
-    { id: "2", title: "Documents Reviewed", desc: `${totalDocs} company documents are uploaded`, time: "2 hrs ago", dot: "bg-blue-500" },
     { id: "3", title: "Service Areas Set", desc: mapped.serviceAreas.join(", ") || "No zones selected", time: "5 hrs ago", dot: "bg-purple-500" },
     { id: "4", title: "Fleet Ready", desc: `${mapped.cars.length} vehicles are ready for operation`, time: "6 hrs ago", dot: "bg-orange-500" },
   ];
@@ -508,7 +520,6 @@ export default function WasteCompanyDashboard() {
     { label: "Schedule", icon: CalendarDays, color: "text-green-700 bg-green-50 hover:bg-green-100", target: "schedule-section" },
     { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
     { label: "Chat", icon: MessageCircle, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "chat-section" },
-    { label: "Documents", icon: FileText, color: "text-orange-600 bg-orange-50 hover:bg-orange-100", target: "documents-section" },
     { label: "Overview", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
   ];
 
@@ -630,7 +641,6 @@ export default function WasteCompanyDashboard() {
             { label: "Schedule", icon: CalendarDays, target: "schedule-section" },
             { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
             { label: "Chat", icon: MessageCircle, target: "chat-section" },
-            { label: "Documents", icon: FileText, target: "documents-section" },
             { label: "Overview", icon: Building2, target: "overview-section" },
             { label: "Settings", icon: Settings, target: "top-section" },
           ].map(({ label, icon: Icon, target }) => {
@@ -669,9 +679,12 @@ export default function WasteCompanyDashboard() {
               </div>
             </div>
           </div>
-          <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition">
-            <LogOut size={15} /> Logout
-          </button>
+          <div className="flex items-center gap-3">
+            <NotificationBell mode="dropdown" buttonClassName="text-gray-600 hover:bg-gray-100" />
+            <button onClick={handleLogout} className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition">
+              <LogOut size={15} /> Logout
+            </button>
+          </div>
         </header>
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-6" id="top-section">
@@ -698,7 +711,7 @@ export default function WasteCompanyDashboard() {
             </div>
             <h1 className="text-3xl font-bold">{application.company_name}</h1>
             <p className="mt-2 text-green-100 text-sm max-w-2xl">
-              Your company profile has been approved. Use this dashboard to manage drivers, vehicles, documents, routes, and daily company activities.
+              Your company profile has been approved. Use this dashboard to manage drivers, vehicles, routes, and daily company activities.
             </p>
             <div className="mt-4 flex flex-wrap gap-4 text-sm text-green-200">
               <span className="flex items-center gap-1"><Mail size={13} /> {application.email}</span>
@@ -712,7 +725,6 @@ export default function WasteCompanyDashboard() {
             {[
               { label: "Total Drivers", value: mapped.drivers.length, sub: "Registered drivers", icon: <Users size={22} className="text-blue-600" />, iconBg: "bg-blue-100", valueColor: "text-blue-600", trend: "+12% this month" },
               { label: "Vehicles Ready", value: mapped.cars.length, sub: "Fleet available", icon: <Truck size={22} className="text-green-600" />, iconBg: "bg-green-100", valueColor: "text-green-600", trend: "+5% vs yesterday" },
-              { label: "Documents", value: totalDocs, sub: "Uploaded files", icon: <FileText size={22} className="text-purple-600" />, iconBg: "bg-purple-100", valueColor: "text-purple-600", trend: "+8% this month" },
               { label: "Service Areas", value: mapped.serviceAreas.length, sub: "Zones covered", icon: <MapPin size={22} className="text-orange-500" />, iconBg: "bg-orange-100", valueColor: "text-orange-500", trend: "Active" },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
@@ -828,8 +840,6 @@ export default function WasteCompanyDashboard() {
               <InfoRow label="Service areas" value={mapped.serviceAreas.join(", ") || "—"} />
               <InfoRow label="Drivers" value={String(mapped.drivers.length)} />
               <InfoRow label="Vehicles" value={String(mapped.cars.length)} />
-              <InfoRow label="Certificates" value={String(mapped.certificates.length)} />
-              <InfoRow label="Tax documents" value={String(mapped.taxCertificates.length)} />
               {application.description && (
                 <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600 mt-1">
                   {application.description}
@@ -875,7 +885,7 @@ export default function WasteCompanyDashboard() {
               </div>
               <div className="mt-4 rounded-2xl bg-gray-50 p-4">
                 <div className="flex items-center gap-2 font-semibold text-gray-800"><Bell size={16} className="text-green-600" /> Recent alerts</div>
-                <p className="mt-2 text-sm text-gray-500">You are fully approved. Keep drivers, vehicles, and documents updated to maintain active operations.</p>
+                <p className="mt-2 text-sm text-gray-500">You are fully approved. Keep drivers, vehicles, and service areas updated to maintain active operations.</p>
               </div>
             </Card>
             </div>
@@ -932,14 +942,6 @@ export default function WasteCompanyDashboard() {
               )}
             </Card>
             </div>
-
-          <Card title="Certificates & Documents" icon={<ShieldCheck size={16} className="text-orange-500" />}>
-            <div className={`grid gap-4 md:grid-cols-3 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'documents-section' ? 'hidden' : ''}`} id="documents-section">
-              <DocList label="Business Certificates" files={mapped.certificates} />
-              <DocList label="RDB Certificates" files={mapped.rdbCertificates} />
-              <DocList label="Tax Clearance" files={mapped.taxCertificates} />
-            </div>
-          </Card>
 
           <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'schedule-section' ? 'hidden' : ''}`} id="schedule-section">
             <Card title="Weekly District Scheduler" icon={<CalendarDays size={16} className="text-green-700" />}>
@@ -1030,9 +1032,25 @@ export default function WasteCompanyDashboard() {
                                   <p className="text-xs text-gray-500">Cells: {task.cells.join(", ")}</p>
                                   <p className="text-xs text-gray-500">{task.driver || "No driver"} • {task.vehicle || "No vehicle"} • {task.startTime}</p>
                                 </div>
-                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${task.status === "Completed" ? "bg-emerald-100 text-emerald-700" : task.status === "In Progress" ? "bg-blue-100 text-blue-700" : task.status === "Cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
-                                  {task.status}
-                                </span>
+                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${task.status === "Completed" ? "bg-emerald-100 text-emerald-700" : task.status === "In Progress" ? "bg-blue-100 text-blue-700" : task.status === "Cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
+                                    {task.status}
+                                  </span>
+                                  <div className="flex items-center gap-1 flex-wrap justify-end">
+                                    <button
+                                      onClick={() => handlePublishToggle(task.id, !task.published)}
+                                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold border transition ${task.published ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+                                    >
+                                      {task.published ? <><Check size={11} /> Published</> : <><Bell size={11} /> Publish</>}
+                                    </button>
+                                    <button onClick={() => openScheduleModal(task)} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 border border-gray-200 hover:bg-gray-100 transition">
+                                      <Edit3 size={11} /> Edit
+                                    </button>
+                                    <button onClick={() => handleDeleteScheduleTask(task.id)} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-red-600 border border-red-100 hover:bg-red-50 transition">
+                                      <Trash2 size={11} /> Delete
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           ))
@@ -1051,7 +1069,13 @@ export default function WasteCompanyDashboard() {
                           <p className="text-xs text-gray-500">{task.scheduleDate}</p>
                           <p className="text-xs text-gray-500">{task.districtName}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                          <button
+                            onClick={() => handlePublishToggle(task.id, !task.published)}
+                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold border transition ${task.published ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+                          >
+                            {task.published ? <><Check size={12} /> Published</> : <><Bell size={12} /> Publish</>}
+                          </button>
                           <button onClick={() => openScheduleModal(task)} className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-200 hover:bg-gray-100 transition">
                             <Edit3 size={12} /> Edit
                           </button>
@@ -1222,6 +1246,16 @@ export default function WasteCompanyDashboard() {
                               <MessageSquare size={12} /> Respond
                             </button>
                           )}
+                          <button
+                            onClick={async () => {
+                              setComplaints(prev => prev.filter(x => x.id !== c.id));
+                              try { await api.complaints.remove(c.id); }
+                              catch { setComplaints(prev => [c, ...prev].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())); }
+                            }}
+                            className="px-3 py-1.5 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-50 transition flex items-center gap-1"
+                          >
+                            <Trash2 size={12} /> Delete
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1700,21 +1734,3 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DocList({ label, files }: { label: string; files: string[] }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{label}</p>
-      {files.length === 0 ? (
-        <p className="text-xs text-gray-400">None uploaded</p>
-      ) : (
-        <ul className="space-y-1">
-          {files.map((f, i) => (
-            <li key={i} className="flex items-center gap-2 text-xs text-gray-700 bg-gray-50 rounded-lg px-3 py-2">
-              <FileText size={12} className="text-gray-400 flex-shrink-0" /> {f}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}

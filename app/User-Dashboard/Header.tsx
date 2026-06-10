@@ -2,6 +2,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { api } from '@/lib/api-client';
 import { Truck } from "lucide-react";
+import NotificationBell from "@/components/NotificationBell";
 
 function getStoredProfile() {
   if (typeof window === 'undefined') {
@@ -81,6 +82,7 @@ export default function Header() {
             </>
           ) : null}
         </div>
+        <NotificationBell mode="link" buttonClassName="text-white hover:bg-white/10" />
         <div className="flex items-center gap-3 relative">
           <button
             onClick={() => setIsProfileOpen(!isProfileOpen)}

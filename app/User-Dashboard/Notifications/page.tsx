@@ -1,73 +1,84 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, CheckCircle, AlertCircle, Info, Trash2 } from "lucide-react";
+import { api, type BackendNotification } from "@/lib/api-client";
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-  type: "info" | "warning" | "success";
-}
+const formatTime = (ts?: string) => {
+  if (!ts) return "";
+  const diff = Date.now() - new Date(ts).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+};
 
-const initialNotifications: Notification[] = [
-  {
-    id: "1",
-    title: "Collection Reminder",
-    message: "Your waste collection is scheduled for tomorrow at 8:00 AM.",
-    time: "2 hours ago",
-    read: false,
-    type: "info",
-  },
-  {
-    id: "2",
-    title: "Payment Due",
-    message: "Your monthly payment of 3,000 RWF is due soon.",
-    time: "1 day ago",
-    read: false,
-    type: "warning",
-  },
-  {
-    id: "3",
-    title: "Collection Completed",
-    message: "Your waste was successfully collected on Jan 10, 2024.",
-    time: "3 days ago",
-    read: true,
-    type: "success",
-  },
-  {
-    id: "4",
-    title: "Route Change",
-    message: "Your collection route has been updated to Route A - Gasabo.",
-    time: "1 week ago",
-    read: true,
-    type: "info",
-  },
-];
+const getIcon = (type: string) => {
+  if (type === "warning") return <AlertCircle className="text-yellow-500" size={20} />;
+  if (type === "success") return <CheckCircle className="text-green-500" size={20} />;
+  return <Info className="text-blue-500" size={20} />;
+};
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<BackendNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const markAllRead = () =>
+  const loadNotifications = async () => {
+    setError("");
+    try {
+      const data = await api.notifications.list();
+      setNotifications(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load notifications.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadNotifications();
+  }, []);
+
+  const markRead = async (id: number) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    try {
+      await api.notifications.markRead(id);
+    } catch {
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
+    }
+  };
+
+  const markAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await api.notifications.markAllRead();
+    } catch {
+      void loadNotifications();
+    }
+  };
 
-  const deleteNotification = (id: string) =>
+  const deleteNotification = async (id: number) => {
+    const item = notifications.find((n) => n.id === id);
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-
-  const markRead = (id: string) =>
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
-
-  const getIcon = (type: string) => {
-    if (type === "warning") return <AlertCircle className="text-yellow-500" size={20} />;
-    if (type === "success") return <CheckCircle className="text-green-500" size={20} />;
-    return <Info className="text-blue-500" size={20} />;
+    try {
+      await api.notifications.remove(id);
+    } catch {
+      if (item) setNotifications((prev) => [...prev, item].sort((a, b) => b.id - a.id));
+    }
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+
+  if (loading) {
+    return (
+      <div className="p-6 flex justify-center py-24">
+        <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -94,6 +105,12 @@ export default function NotificationsPage() {
         )}
       </div>
 
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+
       <div className="space-y-3">
         {notifications.length === 0 ? (
           <div className="text-center py-16 text-gray-400">
@@ -104,7 +121,7 @@ export default function NotificationsPage() {
           notifications.map((n) => (
             <div
               key={n.id}
-              onClick={() => markRead(n.id)}
+              onClick={() => !n.read && markRead(n.id)}
               className={`flex items-start gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                 n.read ? "bg-white border-gray-200" : "bg-green-50 border-green-200"
               }`}
@@ -115,7 +132,7 @@ export default function NotificationsPage() {
                   {n.title}
                 </p>
                 <p className="text-sm text-gray-600 mt-0.5">{n.message}</p>
-                <p className="text-xs text-gray-400 mt-1">{n.time}</p>
+                <p className="text-xs text-gray-400 mt-1">{formatTime(n.created_at)}</p>
               </div>
               {!n.read && (
                 <div className="w-2.5 h-2.5 bg-green-500 rounded-full mt-1.5 flex-shrink-0" />
@@ -123,7 +140,7 @@ export default function NotificationsPage() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  deleteNotification(n.id);
+                  void deleteNotification(n.id);
                 }}
                 className="text-gray-300 hover:text-red-400 transition flex-shrink-0"
               >

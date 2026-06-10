@@ -129,6 +129,16 @@ export interface BackendComplaint {
   zone?: string;
 }
 
+export interface BackendNotification {
+  id: number;
+  user_id: number;
+  title: string;
+  message: string;
+  type: "info" | "warning" | "success";
+  read: boolean;
+  created_at?: string;
+}
+
 export interface BackendCompanySchedule {
   id: number;
   company_id: number;
@@ -144,6 +154,7 @@ export interface BackendCompanySchedule {
   start_time?: string;
   waste_type: string;
   status: string;
+  published: boolean;
   notes?: string;
   created_at?: string;
   updated_at?: string;
@@ -526,6 +537,12 @@ export const api = {
   },
 
   companySchedules: {
+    forCitizen: () =>
+      apiFetch<{ schedules: BackendCompanySchedule[]; district: string; sector: string }>(
+        `/api/company-schedules/citizen`,
+        { method: "GET", auth: true },
+      ),
+
     list: (companyId: number) =>
       apiFetch<{ schedules: BackendCompanySchedule[] }>(`/api/company-schedules/company/${companyId}`, {
         method: "GET",
@@ -561,6 +578,12 @@ export const api = {
         method: "DELETE",
         auth: true,
       }),
+
+    setPublished: (companyId: number, scheduleId: number, published: boolean) =>
+      apiFetch<{ message: string; schedule: BackendCompanySchedule }>(
+        `/api/company-schedules/company/${companyId}/${scheduleId}/publish`,
+        { method: "PATCH", body: JSON.stringify({ published }), auth: true },
+      ),
   },
 
   complaints: {
@@ -587,6 +610,13 @@ export const api = {
         auth: true,
       }),
 
+    editMine: (id: number, payload: { issue_type?: string; description?: string; priority?: string }) =>
+      apiFetch<{ message: string; complaint: BackendComplaint }>(`/api/complaints/${id}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+        auth: true,
+      }),
+
     remove: (id: number) =>
       apiFetch<{ message: string }>(`/api/complaints/${id}`, { method: "DELETE", auth: true }),
 
@@ -595,6 +625,13 @@ export const api = {
         method: "GET",
         auth: true,
       }),
+  },
+
+  notifications: {
+    list: () => apiFetch<BackendNotification[]>("/api/notifications", { method: "GET", auth: true }),
+    markRead: (id: number) => apiFetch<{ message: string }>(`/api/notifications/${id}/read`, { method: "PATCH", auth: true }),
+    markAllRead: () => apiFetch<{ message: string }>("/api/notifications/read-all", { method: "PATCH", auth: true }),
+    remove: (id: number) => apiFetch<{ message: string }>(`/api/notifications/${id}`, { method: "DELETE", auth: true }),
   },
 };
 
