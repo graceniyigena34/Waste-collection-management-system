@@ -536,6 +536,12 @@ export const api = {
   },
 
   companySchedules: {
+    forCitizen: () =>
+      apiFetch<{ schedules: BackendCompanySchedule[]; district: string; sector: string }>(
+        `/api/company-schedules/citizen`,
+        { method: "GET", auth: true },
+      ),
+
     list: (companyId: number) =>
       apiFetch<{ schedules: BackendCompanySchedule[] }>(`/api/company-schedules/company/${companyId}`, {
         method: "GET",

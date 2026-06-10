@@ -1015,9 +1015,19 @@ export default function WasteCompanyDashboard() {
                                   <p className="text-xs text-gray-500">Cells: {task.cells.join(", ")}</p>
                                   <p className="text-xs text-gray-500">{task.driver || "No driver"} • {task.vehicle || "No vehicle"} • {task.startTime}</p>
                                 </div>
-                                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${task.status === "Completed" ? "bg-emerald-100 text-emerald-700" : task.status === "In Progress" ? "bg-blue-100 text-blue-700" : task.status === "Cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
-                                  {task.status}
-                                </span>
+                                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${task.status === "Completed" ? "bg-emerald-100 text-emerald-700" : task.status === "In Progress" ? "bg-blue-100 text-blue-700" : task.status === "Cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
+                                    {task.status}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => openScheduleModal(task)} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 border border-gray-200 hover:bg-gray-100 transition">
+                                      <Edit3 size={11} /> Edit
+                                    </button>
+                                    <button onClick={() => handleDeleteScheduleTask(task.id)} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-red-600 border border-red-100 hover:bg-red-50 transition">
+                                      <Trash2 size={11} /> Delete
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           ))
