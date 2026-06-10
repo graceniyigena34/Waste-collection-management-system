@@ -154,6 +154,7 @@ export interface BackendCompanySchedule {
   start_time?: string;
   waste_type: string;
   status: string;
+  published: boolean;
   notes?: string;
   created_at?: string;
   updated_at?: string;
@@ -577,6 +578,12 @@ export const api = {
         method: "DELETE",
         auth: true,
       }),
+
+    setPublished: (companyId: number, scheduleId: number, published: boolean) =>
+      apiFetch<{ message: string; schedule: BackendCompanySchedule }>(
+        `/api/company-schedules/company/${companyId}/${scheduleId}/publish`,
+        { method: "PATCH", body: JSON.stringify({ published }), auth: true },
+      ),
   },
 
   complaints: {

@@ -35,6 +35,7 @@ interface ScheduleTask {
   startTime: string;
   wasteType: WasteType;
   status: TaskStatus;
+  published: boolean;
   notes: string;
 }
 
@@ -164,6 +165,7 @@ export default function WasteCompanyDashboard() {
           startTime: schedule.start_time || "08:00",
           wasteType: (schedule.waste_type as WasteType) || "General Waste",
           status: (schedule.status as TaskStatus) || "Scheduled",
+          published: schedule.published ?? false,
           notes: schedule.notes || "",
         }));
         setScheduleTasks(nextTasks);
@@ -364,6 +366,7 @@ export default function WasteCompanyDashboard() {
       startTime: scheduleForm.startTime,
       wasteType: scheduleForm.wasteType,
       status: editTask?.status ?? "Scheduled",
+      published: editTask?.published ?? false,
       notes: scheduleForm.notes.trim(),
     };
 
@@ -384,6 +387,7 @@ export default function WasteCompanyDashboard() {
           startTime: updated.schedule.start_time || nextTask.startTime,
           wasteType: (updated.schedule.waste_type as WasteType) || nextTask.wasteType,
           status: (updated.schedule.status as TaskStatus) || nextTask.status,
+          published: updated.schedule.published ?? nextTask.published,
           notes: updated.schedule.notes || nextTask.notes,
         };
         setScheduleTasks((current) => current.map((entry) => (entry.id === editTask.id ? saved : entry)));
@@ -403,6 +407,7 @@ export default function WasteCompanyDashboard() {
           startTime: created.schedule.start_time || nextTask.startTime,
           wasteType: (created.schedule.waste_type as WasteType) || nextTask.wasteType,
           status: (created.schedule.status as TaskStatus) || nextTask.status,
+          published: created.schedule.published ?? false,
           notes: created.schedule.notes || nextTask.notes,
         };
         setScheduleTasks((current) => [saved, ...current]);
@@ -437,6 +442,18 @@ export default function WasteCompanyDashboard() {
     } catch (error) {
       setScheduleTasks((current) => current.map((entry) => (entry.id === taskId ? task : entry)));
       setScheduleMessage(error instanceof Error ? error.message : "Failed to update task status.");
+    }
+  };
+
+  const handlePublishToggle = async (taskId: number, publish: boolean) => {
+    if (!application) return;
+    setScheduleTasks((current) => current.map((t) => (t.id === taskId ? { ...t, published: publish } : t)));
+    try {
+      await api.companySchedules.setPublished(application.id, taskId, publish);
+      setScheduleMessage(publish ? "Schedule published — citizens can now see it." : "Schedule unpublished.");
+    } catch (error) {
+      setScheduleTasks((current) => current.map((t) => (t.id === taskId ? { ...t, published: !publish } : t)));
+      setScheduleMessage(error instanceof Error ? error.message : "Failed to update publish status.");
     }
   };
 
@@ -1019,7 +1036,13 @@ export default function WasteCompanyDashboard() {
                                   <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${task.status === "Completed" ? "bg-emerald-100 text-emerald-700" : task.status === "In Progress" ? "bg-blue-100 text-blue-700" : task.status === "Cancelled" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"}`}>
                                     {task.status}
                                   </span>
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-1 flex-wrap justify-end">
+                                    <button
+                                      onClick={() => handlePublishToggle(task.id, !task.published)}
+                                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold border transition ${task.published ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+                                    >
+                                      {task.published ? <><Check size={11} /> Published</> : <><Bell size={11} /> Publish</>}
+                                    </button>
                                     <button onClick={() => openScheduleModal(task)} className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 border border-gray-200 hover:bg-gray-100 transition">
                                       <Edit3 size={11} /> Edit
                                     </button>
@@ -1046,7 +1069,13 @@ export default function WasteCompanyDashboard() {
                           <p className="text-xs text-gray-500">{task.scheduleDate}</p>
                           <p className="text-xs text-gray-500">{task.districtName}</p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                          <button
+                            onClick={() => handlePublishToggle(task.id, !task.published)}
+                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold border transition ${task.published ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+                          >
+                            {task.published ? <><Check size={12} /> Published</> : <><Bell size={12} /> Publish</>}
+                          </button>
                           <button onClick={() => openScheduleModal(task)} className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 border border-gray-200 hover:bg-gray-100 transition">
                             <Edit3 size={12} /> Edit
                           </button>
