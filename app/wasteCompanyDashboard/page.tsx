@@ -620,6 +620,7 @@ export default function WasteCompanyDashboard() {
     { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
     { label: "Chat", icon: MessageCircle, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "chat-section" },
     { label: "Overview", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
+    { label: "Settings", icon: Settings, color: "text-gray-600 bg-gray-50 hover:bg-gray-100", target: "settings-section" },
   ];
 
   const assignmentZones = companyDistrict ? districtSectors.map((sector) => sector.name) : (mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera"]);
@@ -741,7 +742,7 @@ export default function WasteCompanyDashboard() {
             { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
             { label: "Chat", icon: MessageCircle, target: "chat-section" },
             { label: "Overview", icon: Building2, target: "overview-section" },
-            { label: "Settings", icon: Settings, target: "top-section" },
+            { label: "Settings", icon: Settings, target: "settings-section" },
           ].map(({ label, icon: Icon, target }) => {
             const active = activeSection === target;
             return (
@@ -1559,6 +1560,62 @@ export default function WasteCompanyDashboard() {
                   )}
                 </div>
               </div>
+            </Card>
+          </div>
+
+          {/* ── Settings Section ── */}
+          <div className={`scroll-mt-28 ${activeSection !== "top-section" && activeSection !== "settings-section" ? "hidden" : ""}`} id="settings-section">
+            <Card title="Settings — Driver Management" icon={<Settings size={16} className="text-gray-600" />}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-gray-500">{companyDrivers.length} driver{companyDrivers.length !== 1 ? "s" : ""} registered</p>
+                <button
+                  onClick={() => setAddDriverModal(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition"
+                >
+                  <Plus size={15} /> Add Driver
+                </button>
+              </div>
+
+              {companyDrivers.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-400">
+                  No drivers yet. Click &quot;Add Driver&quot; to get started.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-gray-100">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                      <tr>
+                        {["Name", "Phone", "Email", "License", "Zone", "Experience", "Status", "Actions"].map(h => (
+                          <th key={h} className="px-4 py-3 text-left whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {companyDrivers.map(driver => (
+                        <tr key={driver.id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{driver.name}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{driver.phone}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{driver.email ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{driver.license_number ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{driver.zone ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{driver.years_of_experience ?? 0} yrs</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${driver.status === "active" ? "bg-green-100 text-green-700" : driver.status === "suspended" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                              {driver.status ?? "active"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button onClick={() => openEditDriver(driver)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition" title="Edit"><Edit3 size={14} /></button>
+                              <button onClick={() => void handleDeleteDriver(driver)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete"><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Card>
           </div>
 
