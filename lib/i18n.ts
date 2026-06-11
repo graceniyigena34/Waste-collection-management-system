@@ -311,4 +311,11 @@ export const translations = {
   },
 } as const;
 
-export type T = typeof translations.en;
+// Recursively widens literal string types to `string` so all language objects
+// are assignable to T despite having different literal values.
+type Widened<X> =
+  X extends string ? string :
+  X extends ReadonlyArray<infer U> ? ReadonlyArray<Widened<U>> :
+  { readonly [K in keyof X]: Widened<X[K]> };
+
+export type T = Widened<typeof translations.en>;
