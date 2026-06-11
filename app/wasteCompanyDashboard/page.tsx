@@ -1093,12 +1093,12 @@ export default function WasteCompanyDashboard() {
             </Card>
             </div>
 
-          <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'vehicles-section' ? 'hidden' : ''}`} id="vehicles-section">
+          <div className={`scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'vehicles-section' ? 'hidden' : ''}`} id="vehicles-section">
             <Card title="Fleet / Vehicles" icon={<Car size={16} className="text-purple-600" />}>
               {companyVehicles.length === 0 ? (
                 <p className="text-sm text-gray-400">No vehicles on record. Go to Settings to add vehicles.</p>
               ) : (
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {companyVehicles.map((v) => (
                     <div key={v.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
                       <p className="font-semibold text-gray-900">{v.plate_number} — {v.model}</p>
@@ -1114,36 +1114,6 @@ export default function WasteCompanyDashboard() {
                   Manage vehicles in Settings →
                 </button>
               </div>
-            </Card>
-
-            <Card title="Recent Complaints" icon={<AlertTriangle size={16} className="text-orange-500" />}>
-              {complaintsLoading ? (
-                <div className="flex justify-center py-4">
-                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-green-600" />
-                </div>
-              ) : complaintsError ? (
-                <p className="text-sm text-red-500">{complaintsError}</p>
-              ) : complaints.length === 0 ? (
-                <p className="text-sm text-gray-400">No complaints in your district yet.</p>
-              ) : (
-                <div className="space-y-3">
-                  {complaints.slice(0, 4).map((c) => (
-                    <div key={c.id} className="flex items-start gap-3">
-                      <div className={`w-2.5 h-2.5 rounded-full mt-1.5 flex-shrink-0 ${c.status === "Resolved" ? "bg-green-500" : c.status === "In Progress" ? "bg-blue-500" : "bg-red-500"}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800">{c.issue_type}</p>
-                        <p className="text-xs text-gray-500 truncate">{c.full_name ?? "Unknown"} — {c.description}</p>
-                      </div>
-                      <span className={`text-xs font-medium flex-shrink-0 ${c.status === "Resolved" ? "text-green-600" : c.status === "In Progress" ? "text-blue-600" : "text-orange-600"}`}>{c.status}</span>
-                    </div>
-                  ))}
-                  {complaints.length > 4 && (
-                    <button onClick={() => scrollToSection("complaints-section")} className="text-xs text-green-700 underline">
-                      View all {complaints.length} complaints →
-                    </button>
-                  )}
-                </div>
-              )}
             </Card>
             </div>
 
