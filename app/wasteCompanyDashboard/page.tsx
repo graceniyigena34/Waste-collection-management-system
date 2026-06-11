@@ -1068,12 +1068,12 @@ export default function WasteCompanyDashboard() {
             </div>
           </div>
 
-          <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'drivers-section' ? 'hidden' : ''}`} id="drivers-section">
+          <div className={`scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'drivers-section' ? 'hidden' : ''}`} id="drivers-section">
             <Card title="Driver Roster" icon={<Users size={16} className="text-blue-600" />}>
               {companyDrivers.length === 0 ? (
                 <p className="text-sm text-gray-400">No drivers on record. Go to Settings to add drivers.</p>
               ) : (
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {companyDrivers.map((driver) => (
                     <div key={driver.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
                       <p className="font-semibold text-gray-900">{driver.name}</p>
@@ -1089,21 +1089,6 @@ export default function WasteCompanyDashboard() {
                 <button onClick={() => scrollToSection("settings-section")} className="text-sm text-green-700 hover:underline">
                   Manage drivers in Settings →
                 </button>
-              </div>
-            </Card>
-
-            <Card title="Quick Actions" icon={<ClipboardList size={16} className="text-purple-600" />}>
-              <div className="grid grid-cols-2 gap-3">
-                {quickActions.map(({ label, icon: Icon, color, target }) => (
-                  <button key={label} onClick={() => scrollToSection(target)} className={`flex flex-col items-center gap-2 p-4 rounded-xl font-medium text-sm transition ${color}`}>
-                    <Icon size={22} />
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 rounded-2xl bg-gray-50 p-4">
-                <div className="flex items-center gap-2 font-semibold text-gray-800"><Bell size={16} className="text-green-600" /> Recent alerts</div>
-                <p className="mt-2 text-sm text-gray-500">You are fully approved. Keep drivers, vehicles, and service areas updated to maintain active operations.</p>
               </div>
             </Card>
             </div>
