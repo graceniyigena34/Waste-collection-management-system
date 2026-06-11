@@ -9,9 +9,8 @@ import {
   Clock, AlertTriangle, Bell, Plus,
   CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
 } from "lucide-react";
-import { type BackendComplaint, type BackendChatMessage, type BackendConversationSummary } from "@/lib/api-client";
 import { isWasteCollectorRole } from "@/lib/company-application";
-import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
+import { api, type BackendCompanyProfile, type BackendDriver, type BackendComplaint, type BackendChatMessage, type BackendConversationSummary, getStoredUserInfo } from "@/lib/api-client";
 import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
@@ -102,6 +101,17 @@ export default function WasteCompanyDashboard() {
   const [chatEditingId, setChatEditingId] = useState<number | null>(null);
   const [chatEditText, setChatEditText] = useState("");
 
+  const [addDriverModal, setAddDriverModal] = useState(false);
+  const [addDriverForm, setAddDriverForm] = useState({ name: "", phone: "", email: "", licenseNumber: "", nationalId: "", zone: "Kicukiro", yearsOfExperience: "" });
+  const [addDriverSaving, setAddDriverSaving] = useState(false);
+  const [addDriverError, setAddDriverError] = useState("");
+  const [companyDrivers, setCompanyDrivers] = useState<BackendDriver[]>([]);
+  const [editDriverModal, setEditDriverModal] = useState(false);
+  const [editDriverTarget, setEditDriverTarget] = useState<BackendDriver | null>(null);
+  const [editDriverForm, setEditDriverForm] = useState({ name: "", phone: "", email: "", licenseNumber: "", nationalId: "", zone: "Kicukiro", yearsOfExperience: "" });
+  const [editDriverSaving, setEditDriverSaving] = useState(false);
+  const [editDriverError, setEditDriverError] = useState("");
+
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token || !userInfo || !isWasteCollectorRole(userInfo.role)) {
@@ -129,6 +139,13 @@ export default function WasteCompanyDashboard() {
 
     void loadCompany();
   }, [router, userInfo]);
+
+  useEffect(() => {
+    if (!application?.id) return;
+    api.drivers.list(application.id)
+      .then(res => setCompanyDrivers(res.drivers))
+      .catch(() => {});
+  }, [application?.id]);
 
   const companyDistrict = useMemo(() => getDistrictFromCompany(application?.district), [application?.district]);
   const districtSectors = useMemo(() => (companyDistrict ? getSectorsByDistrict(companyDistrict.id) : []), [companyDistrict]);
@@ -457,6 +474,88 @@ export default function WasteCompanyDashboard() {
     }
   };
 
+  const handleAddDriver = async () => {
+    if (!application) return;
+    if (!addDriverForm.name.trim() || !addDriverForm.phone.trim()) {
+      setAddDriverError("Name and phone are required.");
+      return;
+    }
+    setAddDriverSaving(true);
+    setAddDriverError("");
+    try {
+      const res = await api.drivers.add(application.id, {
+        name: addDriverForm.name.trim(),
+        phone: addDriverForm.phone.trim(),
+        email: addDriverForm.email.trim() || undefined,
+        license_number: addDriverForm.licenseNumber.trim() || undefined,
+        national_id: addDriverForm.nationalId.trim() || undefined,
+        zone: addDriverForm.zone || undefined,
+        years_of_experience: addDriverForm.yearsOfExperience ? parseInt(addDriverForm.yearsOfExperience, 10) : undefined,
+      });
+      setCompanyDrivers(prev => [...prev, res.driver]);
+      setAddDriverModal(false);
+      setAddDriverForm({ name: "", phone: "", email: "", licenseNumber: "", nationalId: "", zone: "Kicukiro", yearsOfExperience: "" });
+    } catch (err) {
+      setAddDriverError(err instanceof Error ? err.message : "Failed to add driver.");
+    } finally {
+      setAddDriverSaving(false);
+    }
+  };
+
+  const openEditDriver = (driver: BackendDriver) => {
+    setEditDriverTarget(driver);
+    setEditDriverForm({
+      name: driver.name,
+      phone: driver.phone,
+      email: driver.email ?? "",
+      licenseNumber: driver.license_number ?? "",
+      nationalId: driver.national_id ?? "",
+      zone: driver.zone ?? "Kicukiro",
+      yearsOfExperience: driver.years_of_experience !== undefined ? String(driver.years_of_experience) : "",
+    });
+    setEditDriverError("");
+    setEditDriverModal(true);
+  };
+
+  const handleEditDriver = async () => {
+    if (!application || !editDriverTarget) return;
+    if (!editDriverForm.name.trim() || !editDriverForm.phone.trim()) {
+      setEditDriverError("Name and phone are required.");
+      return;
+    }
+    setEditDriverSaving(true);
+    setEditDriverError("");
+    try {
+      const res = await api.drivers.update(application.id, editDriverTarget.id, {
+        name: editDriverForm.name.trim(),
+        phone: editDriverForm.phone.trim(),
+        email: editDriverForm.email.trim() || undefined,
+        license_number: editDriverForm.licenseNumber.trim() || undefined,
+        national_id: editDriverForm.nationalId.trim() || undefined,
+        zone: editDriverForm.zone || undefined,
+        years_of_experience: editDriverForm.yearsOfExperience ? parseInt(editDriverForm.yearsOfExperience, 10) : undefined,
+      });
+      setCompanyDrivers(prev => prev.map(d => d.id === editDriverTarget.id ? res.driver : d));
+      setEditDriverModal(false);
+      setEditDriverTarget(null);
+    } catch (err) {
+      setEditDriverError(err instanceof Error ? err.message : "Failed to update driver.");
+    } finally {
+      setEditDriverSaving(false);
+    }
+  };
+
+  const handleDeleteDriver = async (driver: BackendDriver) => {
+    if (!application) return;
+    if (!confirm(`Delete driver "${driver.name}"? This cannot be undone.`)) return;
+    try {
+      await api.drivers.remove(application.id, driver.id);
+      setCompanyDrivers(prev => prev.filter(d => d.id !== driver.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete driver.");
+    }
+  };
+
   const handleDistrictSave = async () => {
     if (!application) return;
     if (!districtDraft.trim()) {
@@ -508,7 +607,7 @@ export default function WasteCompanyDashboard() {
       ];
 
   const activities = [
-    { id: "1", title: "Drivers Updated", desc: `${mapped.drivers.length} drivers available for dispatch`, time: "10 min ago", dot: "bg-green-500" },
+    { id: "1", title: "Drivers Updated", desc: `${companyDrivers.length} drivers available for dispatch`, time: "10 min ago", dot: "bg-green-500" },
     { id: "3", title: "Service Areas Set", desc: mapped.serviceAreas.join(", ") || "No zones selected", time: "5 hrs ago", dot: "bg-purple-500" },
     { id: "4", title: "Fleet Ready", desc: `${mapped.cars.length} vehicles are ready for operation`, time: "6 hrs ago", dot: "bg-orange-500" },
   ];
@@ -521,6 +620,7 @@ export default function WasteCompanyDashboard() {
     { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
     { label: "Chat", icon: MessageCircle, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "chat-section" },
     { label: "Overview", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
+    { label: "Settings", icon: Settings, color: "text-gray-600 bg-gray-50 hover:bg-gray-100", target: "settings-section" },
   ];
 
   const assignmentZones = companyDistrict ? districtSectors.map((sector) => sector.name) : (mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera"]);
@@ -642,7 +742,7 @@ export default function WasteCompanyDashboard() {
             { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
             { label: "Chat", icon: MessageCircle, target: "chat-section" },
             { label: "Overview", icon: Building2, target: "overview-section" },
-            { label: "Settings", icon: Settings, target: "top-section" },
+            { label: "Settings", icon: Settings, target: "settings-section" },
           ].map(({ label, icon: Icon, target }) => {
             const active = activeSection === target;
             return (
@@ -723,7 +823,7 @@ export default function WasteCompanyDashboard() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
             {[
-              { label: "Total Drivers", value: mapped.drivers.length, sub: "Registered drivers", icon: <Users size={22} className="text-blue-600" />, iconBg: "bg-blue-100", valueColor: "text-blue-600", trend: "+12% this month" },
+              { label: "Total Drivers", value: companyDrivers.length, sub: "Registered drivers", icon: <Users size={22} className="text-blue-600" />, iconBg: "bg-blue-100", valueColor: "text-blue-600", trend: "+12% this month" },
               { label: "Vehicles Ready", value: mapped.cars.length, sub: "Fleet available", icon: <Truck size={22} className="text-green-600" />, iconBg: "bg-green-100", valueColor: "text-green-600", trend: "+5% vs yesterday" },
               { label: "Service Areas", value: mapped.serviceAreas.length, sub: "Zones covered", icon: <MapPin size={22} className="text-orange-500" />, iconBg: "bg-orange-100", valueColor: "text-orange-500", trend: "Active" },
             ].map((s) => (
@@ -838,7 +938,7 @@ export default function WasteCompanyDashboard() {
             <Card title="Company Overview" icon={<Building2 size={16} className="text-green-600" />}>
               <InfoRow label="District" value={companyDistrict?.name || application.district || "—"} />
               <InfoRow label="Service areas" value={mapped.serviceAreas.join(", ") || "—"} />
-              <InfoRow label="Drivers" value={String(mapped.drivers.length)} />
+              <InfoRow label="Drivers" value={String(companyDrivers.length)} />
               <InfoRow label="Vehicles" value={String(mapped.cars.length)} />
               {application.description && (
                 <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600 mt-1">
@@ -851,25 +951,24 @@ export default function WasteCompanyDashboard() {
 
           <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'drivers-section' ? 'hidden' : ''}`} id="drivers-section">
             <Card title="Driver Roster" icon={<Users size={16} className="text-blue-600" />}>
-              {mapped.drivers.length === 0 ? (
-                <p className="text-sm text-gray-400">No drivers on record.</p>
+              {companyDrivers.length === 0 ? (
+                <p className="text-sm text-gray-400">No drivers on record. Go to Settings to add drivers.</p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
-                  {mapped.drivers.map((driver, i) => (
-                    <div key={i} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
+                  {companyDrivers.map((driver) => (
+                    <div key={driver.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
                       <p className="font-semibold text-gray-900">{driver.name}</p>
-                      <p className="text-xs text-gray-500">{driver.email} • {driver.phone}</p>
-                      <p className="text-xs text-gray-500">License: {driver.licenseNumber || "N/A"} • ID: {driver.nationalId || "N/A"}</p>
-                      <p className="text-xs text-gray-500">Zone: {driver.zone} • Truck: {driver.truckId || "Unassigned"} • Exp: {driver.yearsOfExperience || "N/A"} yrs</p>
-                      <p className="text-xs text-gray-500">Emergency: {driver.emergencyContactName || "N/A"} ({driver.emergencyContactPhone || "N/A"})</p>
-                      <p className="text-xs text-gray-500">Address: {driver.address || "N/A"}</p>
+                      <p className="text-xs text-gray-500">{driver.email ?? ""} • {driver.phone}</p>
+                      <p className="text-xs text-gray-500">License: {driver.license_number || "N/A"} • ID: {driver.national_id || "N/A"}</p>
+                      <p className="text-xs text-gray-500">Zone: {driver.zone ?? "—"} • Truck: {driver.truck_id || "Unassigned"} • Exp: {driver.years_of_experience ?? "N/A"} yrs</p>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${driver.status === "active" ? "bg-green-100 text-green-700" : driver.status === "suspended" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>{driver.status ?? "active"}</span>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="pt-4 border-t border-gray-100 flex flex-wrap gap-3">
-                <button onClick={goToOnboarding} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition">
-                  <Plus size={15} /> Add driver
+              <div className="pt-4 border-t border-gray-100">
+                <button onClick={() => scrollToSection("settings-section")} className="text-sm text-green-700 hover:underline">
+                  Manage drivers in Settings →
                 </button>
               </div>
             </Card>
@@ -1121,8 +1220,8 @@ export default function WasteCompanyDashboard() {
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Driver</label>
                     <select value={assignmentDriver} onChange={(e) => setAssignmentDriver(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                       <option value="">Select driver</option>
-                      {mapped.drivers.map((driver, index) => (
-                        <option key={`${driver.name}-${index}`} value={driver.name}>{driver.name || `Driver ${index + 1}`}</option>
+                      {companyDrivers.map((driver) => (
+                        <option key={driver.id} value={driver.name}>{driver.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1458,6 +1557,62 @@ export default function WasteCompanyDashboard() {
             </Card>
           </div>
 
+          {/* ── Settings Section ── */}
+          <div className={`scroll-mt-28 ${activeSection !== "top-section" && activeSection !== "settings-section" ? "hidden" : ""}`} id="settings-section">
+            <Card title="Settings — Driver Management" icon={<Settings size={16} className="text-gray-600" />}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-gray-500">{companyDrivers.length} driver{companyDrivers.length !== 1 ? "s" : ""} registered</p>
+                <button
+                  onClick={() => setAddDriverModal(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition"
+                >
+                  <Plus size={15} /> Add Driver
+                </button>
+              </div>
+
+              {companyDrivers.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-400">
+                  No drivers yet. Click &quot;Add Driver&quot; to get started.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-gray-100">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                      <tr>
+                        {["Name", "Phone", "Email", "License", "Zone", "Experience", "Status", "Actions"].map(h => (
+                          <th key={h} className="px-4 py-3 text-left whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {companyDrivers.map(driver => (
+                        <tr key={driver.id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{driver.name}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{driver.phone}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{driver.email ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{driver.license_number ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{driver.zone ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{driver.years_of_experience ?? 0} yrs</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${driver.status === "active" ? "bg-green-100 text-green-700" : driver.status === "suspended" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                              {driver.status ?? "active"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button onClick={() => openEditDriver(driver)} className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition" title="Edit"><Edit3 size={14} /></button>
+                              <button onClick={() => void handleDeleteDriver(driver)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete"><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+
           {/* Complaint detail modal */}
           {viewedComplaint && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1643,7 +1798,7 @@ export default function WasteCompanyDashboard() {
                     <label className="block text-sm font-medium text-gray-700">Driver</label>
                     <select value={scheduleForm.driver} onChange={(e) => setScheduleForm((current) => ({ ...current, driver: e.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                       <option value="">Select driver</option>
-                      {mapped.drivers.map((driver, index) => <option key={`${driver.name || "driver"}-${index}`} value={driver.name || `Driver ${index + 1}`}>{driver.name || `Driver ${index + 1}`}</option>)}
+                      {companyDrivers.map((driver) => <option key={driver.id} value={driver.name}>{driver.name}</option>)}
                     </select>
                   </div>
 
@@ -1709,6 +1864,120 @@ export default function WasteCompanyDashboard() {
           )}
         </div>
       </main>
+
+      {editDriverModal && editDriverTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="font-bold text-gray-900">Edit Driver</h3>
+              <button onClick={() => { setEditDriverModal(false); setEditDriverError(""); }} className="rounded-lg p-1 hover:bg-gray-100 transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {editDriverError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{editDriverError}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+                  <input value={editDriverForm.name} onChange={(e) => setEditDriverForm(f => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone <span className="text-red-500">*</span></label>
+                  <input value={editDriverForm.phone} onChange={(e) => setEditDriverForm(f => ({ ...f, phone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                  <input type="email" value={editDriverForm.email} onChange={(e) => setEditDriverForm(f => ({ ...f, email: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">License No.</label>
+                  <input value={editDriverForm.licenseNumber} onChange={(e) => setEditDriverForm(f => ({ ...f, licenseNumber: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">National ID</label>
+                  <input value={editDriverForm.nationalId} onChange={(e) => setEditDriverForm(f => ({ ...f, nationalId: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Years of Experience</label>
+                  <input type="number" min="0" value={editDriverForm.yearsOfExperience} onChange={(e) => setEditDriverForm(f => ({ ...f, yearsOfExperience: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Zone</label>
+                  <select value={editDriverForm.zone} onChange={(e) => setEditDriverForm(f => ({ ...f, zone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    {(mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera", "Bugesera", "Huye"]).map((z) => (
+                      <option key={z} value={z}>{z}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end border-t px-6 py-4">
+              <button onClick={() => { setEditDriverModal(false); setEditDriverError(""); }} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={handleEditDriver} disabled={editDriverSaving} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 transition disabled:opacity-60">
+                {editDriverSaving && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                {editDriverSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {addDriverModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="font-bold text-gray-900">Add Driver</h3>
+              <button onClick={() => { setAddDriverModal(false); setAddDriverError(""); }} className="rounded-lg p-1 hover:bg-gray-100 transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {addDriverError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{addDriverError}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+                  <input value={addDriverForm.name} onChange={(e) => setAddDriverForm((f) => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. Jean Baptiste" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone <span className="text-red-500">*</span></label>
+                  <input value={addDriverForm.phone} onChange={(e) => setAddDriverForm((f) => ({ ...f, phone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. 0788000000" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                  <input type="email" value={addDriverForm.email} onChange={(e) => setAddDriverForm((f) => ({ ...f, email: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="driver@email.com" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">License No.</label>
+                  <input value={addDriverForm.licenseNumber} onChange={(e) => setAddDriverForm((f) => ({ ...f, licenseNumber: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. RW-2024-001" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">National ID</label>
+                  <input value={addDriverForm.nationalId} onChange={(e) => setAddDriverForm((f) => ({ ...f, nationalId: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="16-digit ID" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Years of Experience</label>
+                  <input type="number" min="0" value={addDriverForm.yearsOfExperience} onChange={(e) => setAddDriverForm((f) => ({ ...f, yearsOfExperience: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="e.g. 3" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Zone</label>
+                  <select value={addDriverForm.zone} onChange={(e) => setAddDriverForm((f) => ({ ...f, zone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    {(mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera", "Bugesera", "Huye"]).map((z) => (
+                      <option key={z} value={z}>{z}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end border-t px-6 py-4">
+              <button onClick={() => { setAddDriverModal(false); setAddDriverError(""); }} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={handleAddDriver} disabled={addDriverSaving} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 transition disabled:opacity-60">
+                {addDriverSaving && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                {addDriverSaving ? "Saving..." : "Add Driver"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
