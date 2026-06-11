@@ -1085,11 +1085,6 @@ export default function WasteCompanyDashboard() {
                   ))}
                 </div>
               )}
-              <div className="pt-4 border-t border-gray-100">
-                <button onClick={() => scrollToSection("settings-section")} className="text-sm text-green-700 hover:underline">
-                  Manage drivers in Settings →
-                </button>
-              </div>
             </Card>
             </div>
 
