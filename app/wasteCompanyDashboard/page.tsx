@@ -952,18 +952,12 @@ export default function WasteCompanyDashboard() {
           <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'drivers-section' ? 'hidden' : ''}`} id="drivers-section">
             <Card title="Driver Roster" icon={<Users size={16} className="text-blue-600" />}>
               {companyDrivers.length === 0 ? (
-                <p className="text-sm text-gray-400">No drivers on record.</p>
+                <p className="text-sm text-gray-400">No drivers on record. Go to Settings to add drivers.</p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
                   {companyDrivers.map((driver) => (
                     <div key={driver.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="font-semibold text-gray-900">{driver.name}</p>
-                        <div className="flex gap-1 flex-shrink-0">
-                          <button onClick={() => openEditDriver(driver)} className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition" title="Edit driver"><Edit3 size={13} /></button>
-                          <button onClick={() => void handleDeleteDriver(driver)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Delete driver"><Trash2 size={13} /></button>
-                        </div>
-                      </div>
+                      <p className="font-semibold text-gray-900">{driver.name}</p>
                       <p className="text-xs text-gray-500">{driver.email ?? ""} • {driver.phone}</p>
                       <p className="text-xs text-gray-500">License: {driver.license_number || "N/A"} • ID: {driver.national_id || "N/A"}</p>
                       <p className="text-xs text-gray-500">Zone: {driver.zone ?? "—"} • Truck: {driver.truck_id || "Unassigned"} • Exp: {driver.years_of_experience ?? "N/A"} yrs</p>
@@ -972,9 +966,9 @@ export default function WasteCompanyDashboard() {
                   ))}
                 </div>
               )}
-              <div className="pt-4 border-t border-gray-100 flex flex-wrap gap-3">
-                <button onClick={() => setAddDriverModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition">
-                  <Plus size={15} /> Add driver
+              <div className="pt-4 border-t border-gray-100">
+                <button onClick={() => scrollToSection("settings-section")} className="text-sm text-green-700 hover:underline">
+                  Manage drivers in Settings →
                 </button>
               </div>
             </Card>
