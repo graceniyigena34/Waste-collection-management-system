@@ -106,6 +106,11 @@ export default function WasteCompanyDashboard() {
   const [addDriverSaving, setAddDriverSaving] = useState(false);
   const [addDriverError, setAddDriverError] = useState("");
   const [companyDrivers, setCompanyDrivers] = useState<BackendDriver[]>([]);
+  const [editDriverModal, setEditDriverModal] = useState(false);
+  const [editDriverTarget, setEditDriverTarget] = useState<BackendDriver | null>(null);
+  const [editDriverForm, setEditDriverForm] = useState({ name: "", phone: "", email: "", licenseNumber: "", nationalId: "", zone: "Kicukiro", yearsOfExperience: "" });
+  const [editDriverSaving, setEditDriverSaving] = useState(false);
+  const [editDriverError, setEditDriverError] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -494,6 +499,60 @@ export default function WasteCompanyDashboard() {
       setAddDriverError(err instanceof Error ? err.message : "Failed to add driver.");
     } finally {
       setAddDriverSaving(false);
+    }
+  };
+
+  const openEditDriver = (driver: BackendDriver) => {
+    setEditDriverTarget(driver);
+    setEditDriverForm({
+      name: driver.name,
+      phone: driver.phone,
+      email: driver.email ?? "",
+      licenseNumber: driver.license_number ?? "",
+      nationalId: driver.national_id ?? "",
+      zone: driver.zone ?? "Kicukiro",
+      yearsOfExperience: driver.years_of_experience !== undefined ? String(driver.years_of_experience) : "",
+    });
+    setEditDriverError("");
+    setEditDriverModal(true);
+  };
+
+  const handleEditDriver = async () => {
+    if (!application || !editDriverTarget) return;
+    if (!editDriverForm.name.trim() || !editDriverForm.phone.trim()) {
+      setEditDriverError("Name and phone are required.");
+      return;
+    }
+    setEditDriverSaving(true);
+    setEditDriverError("");
+    try {
+      const res = await api.drivers.update(application.id, editDriverTarget.id, {
+        name: editDriverForm.name.trim(),
+        phone: editDriverForm.phone.trim(),
+        email: editDriverForm.email.trim() || undefined,
+        license_number: editDriverForm.licenseNumber.trim() || undefined,
+        national_id: editDriverForm.nationalId.trim() || undefined,
+        zone: editDriverForm.zone || undefined,
+        years_of_experience: editDriverForm.yearsOfExperience ? parseInt(editDriverForm.yearsOfExperience, 10) : undefined,
+      });
+      setCompanyDrivers(prev => prev.map(d => d.id === editDriverTarget.id ? res.driver : d));
+      setEditDriverModal(false);
+      setEditDriverTarget(null);
+    } catch (err) {
+      setEditDriverError(err instanceof Error ? err.message : "Failed to update driver.");
+    } finally {
+      setEditDriverSaving(false);
+    }
+  };
+
+  const handleDeleteDriver = async (driver: BackendDriver) => {
+    if (!application) return;
+    if (!confirm(`Delete driver "${driver.name}"? This cannot be undone.`)) return;
+    try {
+      await api.drivers.remove(application.id, driver.id);
+      setCompanyDrivers(prev => prev.filter(d => d.id !== driver.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete driver.");
     }
   };
 
@@ -897,7 +956,13 @@ export default function WasteCompanyDashboard() {
                 <div className="grid gap-3 md:grid-cols-2">
                   {companyDrivers.map((driver) => (
                     <div key={driver.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
-                      <p className="font-semibold text-gray-900">{driver.name}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-semibold text-gray-900">{driver.name}</p>
+                        <div className="flex gap-1 flex-shrink-0">
+                          <button onClick={() => openEditDriver(driver)} className="p-1.5 text-green-600 hover:bg-green-100 rounded-lg transition" title="Edit driver"><Edit3 size={13} /></button>
+                          <button onClick={() => void handleDeleteDriver(driver)} className="p-1.5 text-red-500 hover:bg-red-100 rounded-lg transition" title="Delete driver"><Trash2 size={13} /></button>
+                        </div>
+                      </div>
                       <p className="text-xs text-gray-500">{driver.email ?? ""} • {driver.phone}</p>
                       <p className="text-xs text-gray-500">License: {driver.license_number || "N/A"} • ID: {driver.national_id || "N/A"}</p>
                       <p className="text-xs text-gray-500">Zone: {driver.zone ?? "—"} • Truck: {driver.truck_id || "Unassigned"} • Exp: {driver.years_of_experience ?? "N/A"} yrs</p>
@@ -1748,6 +1813,63 @@ export default function WasteCompanyDashboard() {
           )}
         </div>
       </main>
+
+      {editDriverModal && editDriverTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="font-bold text-gray-900">Edit Driver</h3>
+              <button onClick={() => { setEditDriverModal(false); setEditDriverError(""); }} className="rounded-lg p-1 hover:bg-gray-100 transition">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {editDriverError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{editDriverError}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+                  <input value={editDriverForm.name} onChange={(e) => setEditDriverForm(f => ({ ...f, name: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Phone <span className="text-red-500">*</span></label>
+                  <input value={editDriverForm.phone} onChange={(e) => setEditDriverForm(f => ({ ...f, phone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                  <input type="email" value={editDriverForm.email} onChange={(e) => setEditDriverForm(f => ({ ...f, email: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">License No.</label>
+                  <input value={editDriverForm.licenseNumber} onChange={(e) => setEditDriverForm(f => ({ ...f, licenseNumber: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">National ID</label>
+                  <input value={editDriverForm.nationalId} onChange={(e) => setEditDriverForm(f => ({ ...f, nationalId: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Years of Experience</label>
+                  <input type="number" min="0" value={editDriverForm.yearsOfExperience} onChange={(e) => setEditDriverForm(f => ({ ...f, yearsOfExperience: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Zone</label>
+                  <select value={editDriverForm.zone} onChange={(e) => setEditDriverForm(f => ({ ...f, zone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    {(mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera", "Bugesera", "Huye"]).map((z) => (
+                      <option key={z} value={z}>{z}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end border-t px-6 py-4">
+              <button onClick={() => { setEditDriverModal(false); setEditDriverError(""); }} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={handleEditDriver} disabled={editDriverSaving} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 transition disabled:opacity-60">
+                {editDriverSaving && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                {editDriverSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {addDriverModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
