@@ -211,6 +211,25 @@ export interface BackendCompanySchedule {
   updated_at?: string;
 }
 
+export interface BackendPayment {
+  id: number;
+  user_id: number;
+  household_id: number;
+  amount: number;
+  currency: string;
+  method: string;
+  status: "Paid" | "Pending" | "Overdue" | "Failed";
+  month: string;
+  payment_date?: string;
+  description: string;
+  transaction_ref?: string;
+  paypack_ref?: string;
+  created_at?: string;
+  // Admin-joined fields
+  full_name?: string;
+  zone?: string;
+}
+
 class ApiError extends Error {
   status: number;
   body: unknown;
@@ -390,6 +409,8 @@ export const api = {
         `/api/households/district/${encodeURIComponent(district)}`,
         { method: "GET", auth: true },
       ),
+
+    all: () => apiFetch<BackendHousehold[]>("/api/households", { method: "GET", auth: true }),
   },
 
   companies: {
@@ -714,6 +735,16 @@ export const api = {
     markRead: (id: number) => apiFetch<{ message: string }>(`/api/notifications/${id}/read`, { method: "PATCH", auth: true }),
     markAllRead: () => apiFetch<{ message: string }>("/api/notifications/read-all", { method: "PATCH", auth: true }),
     remove: (id: number) => apiFetch<{ message: string }>(`/api/notifications/${id}`, { method: "DELETE", auth: true }),
+  },
+
+  payments: {
+    me: () => apiFetch<BackendPayment[]>("/api/payments/me", { method: "GET", auth: true }),
+    summary: () =>
+      apiFetch<{ paid_count: number; pending_count: number; overdue_count: number; total_paid: number }>(
+        "/api/payments/me/summary",
+        { method: "GET", auth: true },
+      ),
+    all: () => apiFetch<BackendPayment[]>("/api/payments", { method: "GET", auth: true }),
   },
 
   drivers: {
