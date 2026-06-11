@@ -716,7 +716,7 @@ export default function WasteCompanyDashboard() {
     { label: "Schedule", icon: CalendarDays, color: "text-green-700 bg-green-50 hover:bg-green-100", target: "schedule-section" },
     { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
     { label: "Chat", icon: MessageCircle, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "chat-section" },
-    { label: "Overview", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
+    { label: "Citizens", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
     { label: "Settings", icon: Settings, color: "text-gray-600 bg-gray-50 hover:bg-gray-100", target: "settings-section" },
   ];
 
@@ -838,7 +838,7 @@ export default function WasteCompanyDashboard() {
             { label: "Schedule", icon: CalendarDays, target: "schedule-section" },
             { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
             { label: "Chat", icon: MessageCircle, target: "chat-section" },
-            { label: "Overview", icon: Building2, target: "overview-section" },
+            { label: "Citizens", icon: Building2, target: "overview-section" },
             { label: "Settings", icon: Settings, target: "settings-section" },
           ].map(({ label, icon: Icon, target }) => {
             const active = activeSection === target;
@@ -1032,7 +1032,7 @@ export default function WasteCompanyDashboard() {
               <InfoRow label="TIN / Reg. no." value={application.tin || "—"} />
             </Card>
 
-            <Card title="Company Overview" icon={<Building2 size={16} className="text-green-600" />}>
+            <Card title="Citizens Overview" icon={<Building2 size={16} className="text-green-600" />}>
               <InfoRow label="District" value={companyDistrict?.name || application.district || "—"} />
               <InfoRow label="Service areas" value={mapped.serviceAreas.join(", ") || "—"} />
               <InfoRow label="Drivers" value={String(companyDrivers.length)} />
