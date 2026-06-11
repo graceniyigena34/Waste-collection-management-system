@@ -1,61 +1,51 @@
 "use client";
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Truck, Facebook, Twitter, Instagram, Linkedin, MapPin, Phone, Mail } from "lucide-react";
 import Link from "next/link";
-const Footer: React.FC = () => {
+import { useLanguage } from "@/lib/language-context";
+
+const Footer = () => {
+  const { t } = useLanguage();
   const elementsRef = useRef<(HTMLDivElement | null)[]>([]);
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("animate-fade-in-up");
-          }
+          if (entry.isIntersecting) entry.target.classList.add("animate-fade-in-up");
         });
       },
       { threshold: 0.1 }
     );
-    elementsRef.current.forEach((el) => {
-      if (el) observer.observe(el);
-    });
-    return () => {
-      elementsRef.current.forEach((el) => {
-        if (el) observer.unobserve(el);
-      });
-    };
+    elementsRef.current.forEach((el) => { if (el) observer.observe(el); });
+    return () => { elementsRef.current.forEach((el) => { if (el) observer.unobserve(el); }); };
   }, []);
+
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
-    if (element) {
-      window.scrollTo({
-        top: element.offsetTop - 80,
-        behavior: 'smooth'
-      });
-    }
+    if (element) window.scrollTo({ top: element.offsetTop - 80, behavior: 'smooth' });
   };
-  const footerLinks = {
-    "Home": "home",
-    "About Us": "about",
-    "Services": "services",
-    "Contact": "contact"
-  };
-  const services = [
-    "Real-Time Alerts & Schedule",
-    "Effortless Digital Payments",
-    "Instant Reporting & Resolution for Missed Pickups",
+
+  const footerLinks: { label: string; section: string }[] = [
+    { label: t.footer.links.home, section: 'home' },
+    { label: t.footer.links.aboutUs, section: 'about' },
+    { label: t.footer.links.services, section: 'services' },
+    { label: t.footer.links.contact, section: 'contact' },
   ];
+
   const socialLinks = [
     { icon: <Facebook className="w-5 h-5" />, label: "Facebook" },
     { icon: <Twitter className="w-5 h-5" />, label: "Twitter" },
     { icon: <Instagram className="w-5 h-5" />, label: "Instagram" },
-    { icon: <Linkedin className="w-5 h-5" />, label: "LinkedIn" }
+    { icon: <Linkedin className="w-5 h-5" />, label: "LinkedIn" },
   ];
+
   return (
     <footer className="bg-light-bg dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300 border-t border-gray-200 dark:border-gray-800">
-      {/* Main Footer Content */}
       <div className="py-12 sm:py-16 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 lg:gap-12">
+
             {/* Company Info */}
             <div className="col-span-1 sm:col-span-2 lg:col-span-1">
               <div className="flex items-center gap-3 mb-4 sm:mb-6">
@@ -63,7 +53,7 @@ const Footer: React.FC = () => {
                 <h2 className="text-2xl sm:text-3xl font-bold">EcoTrack</h2>
               </div>
               <p className="text-gray-600 dark:text-gray-400 mb-4 sm:mb-6 leading-relaxed text-sm sm:text-base">
-                Transforming waste management in Rwanda through innovative technology and sustainable practices.
+                {t.footer.desc}
               </p>
               <div className="flex gap-3 sm:gap-4">
                 {socialLinks.map((social, index) => (
@@ -78,14 +68,13 @@ const Footer: React.FC = () => {
                 ))}
               </div>
             </div>
+
             {/* Quick Links */}
             <div>
-              <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">
-                Quick Links
-              </h3>
+              <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{t.footer.quickLinks}</h3>
               <ul className="space-y-3 sm:space-y-4">
-                {Object.entries(footerLinks).map(([label, section], index) => (
-                  <li key={index}>
+                {footerLinks.map(({ label, section }) => (
+                  <li key={section}>
                     <button
                       onClick={() => scrollToSection(section)}
                       className="text-gray-600 dark:text-gray-400 hover:text-primary-green dark:hover:text-white transition-colors duration-300 flex items-center gap-2 group text-sm sm:text-base"
@@ -97,13 +86,12 @@ const Footer: React.FC = () => {
                 ))}
               </ul>
             </div>
+
             {/* Services */}
             <div>
-              <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">
-                Services
-              </h3>
+              <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{t.footer.services}</h3>
               <ul className="space-y-3 sm:space-y-4">
-                {services.map((service, index) => (
+                {t.footer.serviceItems.map((service, index) => (
                   <li key={index}>
                     <a href="#" className="text-gray-600 dark:text-gray-400 hover:text-primary-green dark:hover:text-white transition-colors duration-300 flex items-center gap-2 text-sm sm:text-base">
                       <span className="text-secondary-green">›</span>
@@ -113,11 +101,10 @@ const Footer: React.FC = () => {
                 ))}
               </ul>
             </div>
+
             {/* Contact Info */}
             <div>
-              <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">
-                Contact Info
-              </h3>
+              <h3 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{t.footer.contactInfo}</h3>
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex items-start gap-3 sm:gap-4">
                   <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-secondary-green flex-shrink-0 mt-1" />
@@ -130,7 +117,7 @@ const Footer: React.FC = () => {
                   <Phone className="w-5 h-5 sm:w-6 sm:h-6 text-secondary-green flex-shrink-0" />
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">+250 799 5586</p>
-                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">24/7 Support</p>
+                    <p className="text-gray-600 dark:text-gray-400 text-xs sm:text-sm">{t.footer.support}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 sm:gap-4">
@@ -143,37 +130,37 @@ const Footer: React.FC = () => {
               </div>
             </div>
           </div>
-          {/* Newsletter Subscription */}
+
+          {/* Newsletter */}
           <div className="mt-12 sm:mt-16 bg-gradient-to-r from-primary-green to-secondary-green rounded-xl sm:rounded-2xl p-6 sm:p-8 lg:p-10 text-center text-white shadow-lg">
-            <h3 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">Stay Updated</h3>
+            <h3 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">{t.footer.newsletter.title}</h3>
             <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 opacity-90">
-              Subscribe to our newsletter for the latest updates on sustainable waste management.
+              {t.footer.newsletter.desc}
             </p>
             <div className="max-w-md mx-auto flex flex-col sm:flex-row gap-3 sm:gap-4">
               <input
                 type="email"
-                placeholder="Your email address"
+                placeholder={t.footer.newsletter.placeholder}
                 className="flex-1 px-4 sm:px-6 py-3 sm:py-4 rounded-lg sm:rounded-xl bg-white/20 border border-white/30 text-white placeholder-white/80 focus:outline-none focus:border-white focus:bg-white/30 transition-colors duration-300 text-sm sm:text-base"
               />
               <button className="bg-white text-primary-green px-6 sm:px-8 py-3 sm:py-4 rounded-lg sm:rounded-xl font-bold hover:shadow-2xl transition-all duration-300 hover:scale-105 text-sm sm:text-base">
-                Subscribe
+                {t.footer.newsletter.subscribe}
               </button>
             </div>
           </div>
         </div>
       </div>
-      {/* Bottom Bar */}
+
+      {/* Bottom bar */}
       <div className="border-t border-gray-200 dark:border-gray-900 py-6 sm:py-8 transition-colors duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col md:flex-row justify-center text-center items-center gap-4 sm:gap-6">
-            <div className="text-gray-600 dark:text-gray-400 text-center md:text-left">
-              <p className="text-sm sm:text-base lg:text-lg">
-                © 2025 EcoTrack - Creating a cleaner Rwanda through technology
-              </p>
-            </div>
+            <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base lg:text-lg">
+              {t.footer.copyright}
+            </p>
             <div className="flex gap-6 sm:gap-8 text-xs sm:text-sm font-semibold opacity-70">
-              <Link href="/privacy" className="hover:text-primary-green transition-colors">Privacy Policy</Link>
-              <Link href="/terms" className="hover:text-primary-green transition-colors">Terms & Conditions</Link>
+              <Link href="/privacy" className="hover:text-primary-green transition-colors">{t.footer.privacy}</Link>
+              <Link href="/terms" className="hover:text-primary-green transition-colors">{t.footer.terms}</Link>
             </div>
           </div>
         </div>
@@ -181,4 +168,5 @@ const Footer: React.FC = () => {
     </footer>
   );
 };
+
 export default Footer;

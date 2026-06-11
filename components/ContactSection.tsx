@@ -1,22 +1,23 @@
 "use client";
-import React, { useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { MapPin, Phone, Mail, Send, CheckCircle } from "lucide-react";
+import { useLanguage } from "@/lib/language-context";
 
-const ContactSection: React.FC = () => {
+const ContactSection = () => {
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
+  const { t } = useLanguage();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: { target: { name: string; value: string } }) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (!form.name.trim() || !form.email.trim() || !form.message.trim()) return;
     setSending(true);
-    // Simulate a short delay then show success
     await new Promise((r) => setTimeout(r, 800));
     setSending(false);
     setSubmitted(true);
@@ -27,21 +28,20 @@ const ContactSection: React.FC = () => {
   const contactDetails = [
     {
       icon: <MapPin className="w-6 h-6 text-secondary-green flex-shrink-0" />,
-      label: "Address",
+      label: t.contact.address,
       lines: ["KN 2 Rd, Kigali Heights", "Kigali, Rwanda"],
     },
     {
       icon: <Phone className="w-6 h-6 text-secondary-green flex-shrink-0" />,
-      label: "Phone",
-      lines: ["+250 799 5586", "24/7 Support"],
+      label: t.contact.phone,
+      lines: ["+250 799 5586", t.contact.support],
     },
     {
       icon: <Mail className="w-6 h-6 text-secondary-green flex-shrink-0" />,
-      label: "Email",
+      label: t.contact.email,
       lines: ["info@EcoTrack.rw", "EcoTrack@rwandaclean.com"],
     },
   ];
-
 
   return (
     <section
@@ -49,7 +49,6 @@ const ContactSection: React.FC = () => {
       className="py-16 sm:py-24 px-4 sm:px-6 bg-white dark:bg-gray-900 transition-colors duration-300"
     >
       <div className="max-w-7xl mx-auto">
-        {/* Heading */}
         <motion.div
           className="text-center mb-12 sm:mb-16"
           initial={{ opacity: 0, y: 30 }}
@@ -58,13 +57,13 @@ const ContactSection: React.FC = () => {
           transition={{ duration: 0.6 }}
         >
           <span className="inline-block bg-green-100 dark:bg-green-900/30 text-primary-green dark:text-secondary-green text-sm font-semibold px-4 py-1.5 rounded-full mb-4">
-            Contact Us
+            {t.contact.badge}
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-            Get In Touch
+            {t.contact.title}
           </h2>
           <p className="text-gray-500 dark:text-gray-400 text-base sm:text-lg max-w-2xl mx-auto">
-            Have a question or need support? We&apos;re here to help. Send us a message and we&apos;ll get back to you as soon as possible.
+            {t.contact.desc}
           </p>
         </motion.div>
 
@@ -105,43 +104,31 @@ const ContactSection: React.FC = () => {
           >
             {submitted ? (
               <div className="flex flex-col items-center justify-center py-12 text-center gap-4">
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 200 }}
-                >
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 200 }}>
                   <CheckCircle className="w-16 h-16 text-green-500" />
                 </motion.div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Message Sent!</h3>
-                <p className="text-gray-500 dark:text-gray-400">Thank you for reaching out. We&apos;ll respond within 24 hours.</p>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{t.contact.success.title}</h3>
+                <p className="text-gray-500 dark:text-gray-400">{t.contact.success.desc}</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      Full Name <span className="text-red-400">*</span>
+                      {t.contact.form.fullName} <span className="text-red-400">*</span>
                     </label>
                     <input
-                      type="text"
-                      name="name"
-                      value={form.name}
-                      onChange={handleChange}
-                      required
-                      placeholder="John Doe"
+                      type="text" name="name" value={form.name} onChange={handleChange} required
+                      placeholder={t.contact.form.placeholderName}
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-green dark:focus:ring-secondary-green transition text-sm"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                      Email Address <span className="text-red-400">*</span>
+                      {t.contact.form.emailAddr} <span className="text-red-400">*</span>
                     </label>
                     <input
-                      type="email"
-                      name="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      required
+                      type="email" name="email" value={form.email} onChange={handleChange} required
                       placeholder="john@example.com"
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-green dark:focus:ring-secondary-green transition text-sm"
                     />
@@ -149,34 +136,26 @@ const ContactSection: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Subject
+                    {t.contact.form.subject}
                   </label>
                   <input
-                    type="text"
-                    name="subject"
-                    value={form.subject}
-                    onChange={handleChange}
-                    placeholder="How can we help?"
+                    type="text" name="subject" value={form.subject} onChange={handleChange}
+                    placeholder={t.contact.form.placeholderSubject}
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-green dark:focus:ring-secondary-green transition text-sm"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
-                    Message <span className="text-red-400">*</span>
+                    {t.contact.form.message} <span className="text-red-400">*</span>
                   </label>
                   <textarea
-                    name="message"
-                    value={form.message}
-                    onChange={handleChange}
-                    required
-                    rows={5}
-                    placeholder="Write your message here..."
+                    name="message" value={form.message} onChange={handleChange} required rows={5}
+                    placeholder={t.contact.form.placeholderMessage}
                     className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-green dark:focus:ring-secondary-green transition resize-none text-sm"
                   />
                 </div>
                 <motion.button
-                  type="submit"
-                  disabled={sending}
+                  type="submit" disabled={sending}
                   className="w-full flex items-center justify-center gap-2 bg-primary-green dark:bg-secondary-green text-white py-3.5 px-6 rounded-xl font-semibold text-sm sm:text-base hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
@@ -184,9 +163,7 @@ const ContactSection: React.FC = () => {
                   {sending ? (
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <>
-                      <Send size={18} /> Send Message
-                    </>
+                    <><Send size={18} /> {t.contact.form.send}</>
                   )}
                 </motion.button>
               </form>

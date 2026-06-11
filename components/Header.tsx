@@ -1,10 +1,11 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Truck, Moon, Sun, Menu } from "lucide-react";
+import { Truck, Moon, Sun, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/lib/language-context";
+import { LANGUAGES } from "@/lib/i18n";
 
 interface HeaderProps {
   activeSection: string;
@@ -15,42 +16,32 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMode }) => {
   const [menuOpen, setMenuOpen] = useState<boolean>(false);
   const [scrolled, setScrolled] = useState<boolean>(false);
-
+  const { lang, setLang, t } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 50);
-    };
+    const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   useEffect(() => {
-    if (menuOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
-    }
-
-    return () => {
-      document.body.style.overflow = 'auto';
-    };
+    document.body.style.overflow = menuOpen ? 'hidden' : 'auto';
+    return () => { document.body.style.overflow = 'auto'; };
   }, [menuOpen]);
 
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
-      window.scrollTo({
-        top: element.offsetTop - 80,
-        behavior: 'smooth'
-      })
+      window.scrollTo({ top: element.offsetTop - 80, behavior: 'smooth' });
       setMenuOpen(false);
     }
-  }
+  };
 
   const isActive = (section: string) =>
-    activeSection === section ? "underline underline-offset-8 decoration-2 text-primary-green dark:text-secondary-green" : "";
+    activeSection === section
+      ? "underline underline-offset-8 decoration-2 text-primary-green dark:text-secondary-green"
+      : "";
 
   const headerBgClass = scrolled
     ? "bg-white/95 dark:bg-gray-800/95 backdrop-blur-md shadow-lg"
@@ -58,24 +49,40 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
 
   const navVariants = {
     hidden: { opacity: 0, y: -20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.3,
-        staggerChildren: 0.1
-      }
-    }
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, staggerChildren: 0.1 } },
   };
-
   const itemVariants = {
     hidden: { opacity: 0, y: -10 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.2 }
-    }
+    visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
   };
+
+  const LangSwitcher = ({ isMobile }: { isMobile?: boolean }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <motion.button
+          className="flex items-center gap-1.5 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-sm font-medium"
+          aria-label="Switch language"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <Globe size={18} />
+          <span className={isMobile ? 'text-base' : 'text-xs uppercase tracking-wide'}>{lang}</span>
+        </motion.button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[140px]">
+        {LANGUAGES.map((l) => (
+          <DropdownMenuItem
+            key={l.code}
+            onClick={() => setLang(l.code)}
+            className={`flex items-center gap-2 cursor-pointer ${lang === l.code ? 'font-semibold text-primary-green' : ''}`}
+          >
+            <span>{l.flag}</span>
+            <span>{l.label}</span>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <motion.header
@@ -85,16 +92,14 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
       transition={{ duration: 0.5, ease: "easeOut" }}
     >
       <nav className="flex justify-between items-center px-4 sm:px-6 lg:px-10 py-3 sm:py-4">
+        {/* Logo */}
         <motion.div
           className="flex items-center gap-2"
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <motion.div
-            whileHover={{ rotate: 360 }}
-            transition={{ duration: 0.5 }}
-          >
+          <motion.div whileHover={{ rotate: 360 }} transition={{ duration: 0.5 }}>
             <Truck size={32} className="sm:w-10 sm:h-10 lg:w-11 lg:h-11 text-primary-green dark:text-secondary-green" />
           </motion.div>
           <motion.h1
@@ -106,6 +111,7 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
           </motion.h1>
         </motion.div>
 
+        {/* Desktop nav links (shown on scroll) */}
         <div className="hidden lg:flex absolute left-1/2 transform -translate-x-1/2">
           <AnimatePresence>
             {scrolled && (
@@ -116,53 +122,34 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
                 animate="visible"
                 exit="hidden"
               >
-                <motion.button
-                  onClick={() => scrollToSection("home")}
-                  className={`${isActive("home")} hover:text-primary-green dark:hover:text-secondary-green transition-colors`}
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Home
-                </motion.button>
-                <motion.button
-                  onClick={() => scrollToSection("about")}
-                  className={`${isActive("about")}  hover:text-primary-green dark:hover:text-secondary-green transition-colors`}
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  About
-                </motion.button>
-                <motion.button
-                  onClick={() => scrollToSection("services")}
-                  className={`${isActive("services")} hover:text-primary-green dark:hover:text-secondary-green transition-colors`}
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Services
-                </motion.button>
-                <motion.button
-                  onClick={() => scrollToSection("contact")}
-                  className={`${isActive("contact")} hover:text-primary-green dark:hover:text-secondary-green transition-colors`}
-                  variants={itemVariants}
-                  whileHover={{ scale: 1.1, y: -2 }}
-                  whileTap={{ scale: 0.95 }}
-                >
-                  Contact Us
-                </motion.button>
+                {(['home', 'about', 'services', 'contact'] as const).map((section) => (
+                  <motion.button
+                    key={section}
+                    onClick={() => scrollToSection(section)}
+                    className={`${isActive(section)} hover:text-primary-green dark:hover:text-secondary-green transition-colors`}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.1, y: -2 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    {section === 'home' && t.nav.home}
+                    {section === 'about' && t.nav.about}
+                    {section === 'services' && t.nav.services}
+                    {section === 'contact' && t.nav.contact}
+                  </motion.button>
+                ))}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
 
+        {/* Desktop right actions */}
         <motion.div
-          className="hidden lg:flex items-center gap-4 lg:gap-6"
+          className="hidden lg:flex items-center gap-3 lg:gap-4"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
+          <LangSwitcher />
           <motion.button
             onClick={onThemeToggle}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -173,7 +160,6 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
           >
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
           </motion.button>
-
           <motion.button
             onClick={() => router.push("/signin")}
             className="bg-primary-green dark:bg-secondary-green text-white px-4 lg:px-6 py-2 rounded-lg font-medium text-sm lg:text-base hover:bg-opacity-90 transition-all"
@@ -181,16 +167,18 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
             whileTap={{ scale: 0.95 }}
             transition={{ duration: 0.2 }}
           >
-            Request pickup
+            {t.nav.requestPickup}
           </motion.button>
         </motion.div>
 
+        {/* Mobile right actions */}
         <motion.div
-          className="flex items-center gap-3 lg:hidden"
+          className="flex items-center gap-2 lg:hidden"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, delay: 0.3 }}
         >
+          <LangSwitcher />
           <motion.button
             onClick={onThemeToggle}
             className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -200,7 +188,6 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
           >
             {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
           </motion.button>
-
           <motion.button
             className="text-foreground text-3xl"
             onClick={() => setMenuOpen(!menuOpen)}
@@ -231,62 +218,23 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
               initial="hidden"
               animate="visible"
             >
-              <motion.button
-                onClick={() => scrollToSection("home")}
-                className={`${isActive("home")} hover:text-primary-green dark:hover:text-secondary-green transition-colors duration-200 py-2 w-full text-center`}
-                variants={itemVariants}
-                whileHover={{ scale: 1.05, x: 10 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Home
-              </motion.button>
-              <motion.button
-                onClick={() => scrollToSection("about")}
-                className={`${isActive("about")} hover:text-primary-green dark:hover:text-secondary-green transition-colors duration-200 py-2 w-full text-center`}
-                variants={itemVariants}
-                whileHover={{ scale: 1.05, x: 10 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                About
-              </motion.button>
-              <motion.button
-                onClick={() => scrollToSection("services")}
-                className={`${isActive("services")} hover:text-primary-green dark:hover:text-secondary-green transition-colors duration-200 py-2 w-full text-center`}
-                variants={itemVariants}
-                whileHover={{ scale: 1.05, x: 10 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Services
-              </motion.button>
-              <motion.button
-                onClick={() => scrollToSection("contact")}
-                className={`${isActive("contact")} hover:text-primary-green dark:hover:text-secondary-green transition-colors duration-200 py-2 w-full text-center`}
-                variants={itemVariants}
-                whileHover={{ scale: 1.05, x: 10 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Contact Us
-              </motion.button>
-
-              {/* Navigation Links
-              <motion.button
-                onClick={() => { router.push('/onboarding'); setMenuOpen(false); }}
-                className="hover:text-primary-green dark:hover:text-secondary-green transition-colors duration-200 py-2 w-full text-center"
-                variants={itemVariants}
-                whileHover={{ scale: 1.05, x: 10 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Onboarding
-              </motion.button>
-              <motion.button
-                onClick={() => { router.push('/wasteCompanyDashboard'); setMenuOpen(false); }}
-                className="hover:text-primary-green dark:hover:text-secondary-green transition-colors duration-200 py-2 w-full text-center"
-                variants={itemVariants}
-                whileHover={{ scale: 1.05, x: 10 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Waste Company Dashboard
-              </motion.button> */}
+              {([
+                { id: 'home', label: t.nav.home },
+                { id: 'about', label: t.nav.about },
+                { id: 'services', label: t.nav.services },
+                { id: 'contact', label: t.nav.contact },
+              ] as const).map(({ id, label }) => (
+                <motion.button
+                  key={id}
+                  onClick={() => scrollToSection(id)}
+                  className={`${isActive(id)} hover:text-primary-green dark:hover:text-secondary-green transition-colors duration-200 py-2 w-full text-center`}
+                  variants={itemVariants}
+                  whileHover={{ scale: 1.05, x: 10 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {label}
+                </motion.button>
+              ))}
 
               <motion.button
                 onClick={() => router.push("/signin")}
@@ -295,7 +243,7 @@ const Header: React.FC<HeaderProps> = ({ activeSection, onThemeToggle, isDarkMod
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.95 }}
               >
-                Request pickup
+                {t.nav.requestPickup}
               </motion.button>
             </motion.div>
           </motion.div>
