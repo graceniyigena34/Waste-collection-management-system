@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import {
   Truck, Users, Building2, DollarSign, MapPin, CreditCard,
   MessageSquare, BarChart3, Settings, Home,
-  LogOut, Bell, Menu, X, ChevronRight, ClipboardList,
+  LogOut, Bell, Menu, X, ChevronRight, ClipboardList, PackagePlus,
 } from 'lucide-react';
 
 const navItems = [
@@ -16,6 +16,7 @@ const navItems = [
   { label: 'Routes', icon: MapPin, href: '/admin/routes' },
   { label: 'Payments', icon: CreditCard, href: '/admin/payments' },
   { label: 'Complaints', icon: MessageSquare, href: '/admin/complaints' },
+  { label: 'Pickup Requests', icon: PackagePlus, href: '/admin/pickup-requests' },
   { label: 'Reports', icon: BarChart3, href: '/admin/reports' },
   { label: 'Settings', icon: Settings, href: '/admin/settings' },
 ];
