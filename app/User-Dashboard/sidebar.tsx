@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, Route, CreditCard, Users, Truck, FileText, Bell, MessageCircle } from 'lucide-react';
+import { Home, Calendar, CreditCard, Users, Truck, FileText, Bell, MessageCircle } from 'lucide-react';
 
 export default function Sidebar() {
   const pathname = usePathname();
@@ -9,7 +9,6 @@ export default function Sidebar() {
   const navItems = [
     { href: '/User-Dashboard', icon: Home, label: 'Home' },
     { href: '/User-Dashboard/Schedule', icon: Calendar, label: 'Schedule' },
-    { href: '/User-Dashboard/Route', icon: Route, label: 'Route' },
     { href: '/User-Dashboard/Payments', icon: CreditCard, label: 'Payments' },
     { href: '/User-Dashboard/Complaints', icon: FileText, label: 'Complaints' },
     { href: '/User-Dashboard/RequestPickup', icon: Truck, label: 'Request Pickup' },
