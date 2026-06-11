@@ -10,7 +10,7 @@ import {
   CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
 } from "lucide-react";
 import { isWasteCollectorRole } from "@/lib/company-application";
-import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendChatMessage, type BackendConversationSummary, getStoredUserInfo } from "@/lib/api-client";
+import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, getStoredUserInfo } from "@/lib/api-client";
 import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
@@ -88,6 +88,11 @@ export default function WasteCompanyDashboard() {
   const [respondStatus, setRespondStatus] = useState<"In Progress" | "Resolved">("In Progress");
   const [respondSaving, setRespondSaving] = useState(false);
   const [respondError, setRespondError] = useState("");
+
+  const [citizens, setCitizens] = useState<BackendHousehold[]>([]);
+  const [citizensLoading, setCitizensLoading] = useState(false);
+  const [citizensError, setCitizensError] = useState("");
+  const [citizenSearch, setCitizenSearch] = useState("");
 
   const [chatConversations, setChatConversations] = useState<BackendConversationSummary[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -227,6 +232,23 @@ export default function WasteCompanyDashboard() {
       }
     };
     void loadComplaints();
+  }, [application?.district]);
+
+  useEffect(() => {
+    if (!application?.district) return;
+    const loadCitizens = async () => {
+      setCitizensLoading(true);
+      setCitizensError("");
+      try {
+        const res = await api.households.byDistrict(application.district!);
+        setCitizens(res.households);
+      } catch (err) {
+        setCitizensError(err instanceof Error ? err.message : "Failed to load citizens.");
+      } finally {
+        setCitizensLoading(false);
+      }
+    };
+    void loadCitizens();
   }, [application?.district]);
 
   const handleRespond = async () => {
@@ -716,7 +738,7 @@ export default function WasteCompanyDashboard() {
     { label: "Schedule", icon: CalendarDays, color: "text-green-700 bg-green-50 hover:bg-green-100", target: "schedule-section" },
     { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
     { label: "Chat", icon: MessageCircle, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "chat-section" },
-    { label: "Citizens", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "overview-section" },
+    { label: "Citizens", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "citizens-section" },
     { label: "Settings", icon: Settings, color: "text-gray-600 bg-gray-50 hover:bg-gray-100", target: "settings-section" },
   ];
 
@@ -838,7 +860,7 @@ export default function WasteCompanyDashboard() {
             { label: "Schedule", icon: CalendarDays, target: "schedule-section" },
             { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
             { label: "Chat", icon: MessageCircle, target: "chat-section" },
-            { label: "Citizens", icon: Building2, target: "overview-section" },
+            { label: "Citizens", icon: Building2, target: "citizens-section" },
             { label: "Settings", icon: Settings, target: "settings-section" },
           ].map(({ label, icon: Icon, target }) => {
             const active = activeSection === target;
@@ -1652,6 +1674,85 @@ export default function WasteCompanyDashboard() {
                   )}
                 </div>
               </div>
+            </Card>
+          </div>
+
+          {/* ── Citizens Section ── */}
+          <div className={`scroll-mt-28 ${activeSection !== "top-section" && activeSection !== "citizens-section" ? "hidden" : ""}`} id="citizens-section">
+            <Card title={`Citizens — ${companyDistrict?.name || application.district || "Your District"}`} icon={<Users size={16} className="text-emerald-600" />}>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {[
+                  { label: "Total", value: citizens.length, color: "text-emerald-600 bg-emerald-50" },
+                  { label: "Active", value: citizens.filter(c => c.status === "Active").length, color: "text-green-600 bg-green-50" },
+                  { label: "Residents", value: citizens.reduce((sum, c) => sum + (c.residents ?? 0), 0), color: "text-blue-600 bg-blue-50" },
+                ].map(s => (
+                  <div key={s.label} className={`${s.color} rounded-xl p-3 text-center`}>
+                    <p className="text-xl font-bold">{s.value}</p>
+                    <p className="text-xs">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mb-4">
+                <input
+                  value={citizenSearch}
+                  onChange={e => setCitizenSearch(e.target.value)}
+                  placeholder="Search by name, email, sector or cell…"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {citizensLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-emerald-600" />
+                </div>
+              ) : citizensError ? (
+                <p className="text-sm text-red-500">{citizensError}</p>
+              ) : !application.district ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                  Set your working district above to see citizens registered in your area.
+                </div>
+              ) : citizens.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+                  <Users size={32} className="mx-auto mb-2 opacity-30" />
+                  No citizens found in {companyDistrict?.name || application.district}.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-gray-100">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                      <tr>
+                        {["Name", "Email", "Phone", "Sector", "Cell", "House Type", "Residents", "Status"].map(h => (
+                          <th key={h} className="px-4 py-3 text-left whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {citizens
+                        .filter(c => {
+                          const q = citizenSearch.toLowerCase();
+                          return !q || c.full_name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.sector.toLowerCase().includes(q) || c.cell.toLowerCase().includes(q);
+                        })
+                        .map(c => (
+                          <tr key={c.id} className="hover:bg-gray-50 transition">
+                            <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{c.full_name}</td>
+                            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{c.email}</td>
+                            <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{c.telephone}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{c.sector}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{c.cell}</td>
+                            <td className="px-4 py-3 text-gray-500 whitespace-nowrap capitalize">{c.house_type.toLowerCase()}</td>
+                            <td className="px-4 py-3 text-gray-600 text-center whitespace-nowrap">{c.residents}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${c.status === "Active" ? "bg-green-100 text-green-700" : c.status === "Suspended" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}>
+                                {c.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Card>
           </div>
 

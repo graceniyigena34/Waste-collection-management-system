@@ -152,6 +152,25 @@ export interface BackendNotification {
   created_at?: string;
 }
 
+export interface BackendHousehold {
+  id: number;
+  user_id: number;
+  district: string;
+  sector: string;
+  cell: string;
+  village: string;
+  street_address: string;
+  house_type: string;
+  residents: number;
+  notes?: string;
+  zone?: string;
+  status: string;
+  created_at?: string;
+  full_name: string;
+  email: string;
+  telephone: string;
+}
+
 export interface BackendDriver {
   id: number;
   company_id: number;
@@ -365,6 +384,12 @@ export const api = {
       district: string; sector: string; cell: string; village: string;
       street_address: string; house_type: string; residents: number; notes: string;
     }>) => apiFetch("/api/households/me", { method: "PUT", body: JSON.stringify(payload), auth: true }),
+
+    byDistrict: (district: string) =>
+      apiFetch<{ district: string; count: number; households: BackendHousehold[] }>(
+        `/api/households/district/${encodeURIComponent(district)}`,
+        { method: "GET", auth: true },
+      ),
   },
 
   companies: {
