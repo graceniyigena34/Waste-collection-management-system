@@ -9,9 +9,8 @@ import {
   Clock, AlertTriangle, Bell, Plus,
   CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
 } from "lucide-react";
-import { type BackendComplaint, type BackendChatMessage, type BackendConversationSummary } from "@/lib/api-client";
 import { isWasteCollectorRole } from "@/lib/company-application";
-import { api, type BackendCompanyProfile, getStoredUserInfo } from "@/lib/api-client";
+import { api, type BackendCompanyProfile, type BackendDriver, type BackendComplaint, type BackendChatMessage, type BackendConversationSummary, getStoredUserInfo } from "@/lib/api-client";
 import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
@@ -106,6 +105,7 @@ export default function WasteCompanyDashboard() {
   const [addDriverForm, setAddDriverForm] = useState({ name: "", phone: "", email: "", licenseNumber: "", nationalId: "", zone: "Kicukiro", yearsOfExperience: "" });
   const [addDriverSaving, setAddDriverSaving] = useState(false);
   const [addDriverError, setAddDriverError] = useState("");
+  const [companyDrivers, setCompanyDrivers] = useState<BackendDriver[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -134,6 +134,13 @@ export default function WasteCompanyDashboard() {
 
     void loadCompany();
   }, [router, userInfo]);
+
+  useEffect(() => {
+    if (!application?.id) return;
+    api.drivers.list(application.id)
+      .then(res => setCompanyDrivers(res.drivers))
+      .catch(() => {});
+  }, [application?.id]);
 
   const companyDistrict = useMemo(() => getDistrictFromCompany(application?.district), [application?.district]);
   const districtSectors = useMemo(() => (companyDistrict ? getSectorsByDistrict(companyDistrict.id) : []), [companyDistrict]);
@@ -480,8 +487,7 @@ export default function WasteCompanyDashboard() {
         zone: addDriverForm.zone || undefined,
         years_of_experience: addDriverForm.yearsOfExperience ? parseInt(addDriverForm.yearsOfExperience, 10) : undefined,
       });
-      const updatedDrivers = [...(Array.isArray(application.drivers) ? application.drivers : []), res.driver];
-      setApplication({ ...application, drivers: updatedDrivers });
+      setCompanyDrivers(prev => [...prev, res.driver]);
       setAddDriverModal(false);
       setAddDriverForm({ name: "", phone: "", email: "", licenseNumber: "", nationalId: "", zone: "Kicukiro", yearsOfExperience: "" });
     } catch (err) {
@@ -542,7 +548,7 @@ export default function WasteCompanyDashboard() {
       ];
 
   const activities = [
-    { id: "1", title: "Drivers Updated", desc: `${mapped.drivers.length} drivers available for dispatch`, time: "10 min ago", dot: "bg-green-500" },
+    { id: "1", title: "Drivers Updated", desc: `${companyDrivers.length} drivers available for dispatch`, time: "10 min ago", dot: "bg-green-500" },
     { id: "3", title: "Service Areas Set", desc: mapped.serviceAreas.join(", ") || "No zones selected", time: "5 hrs ago", dot: "bg-purple-500" },
     { id: "4", title: "Fleet Ready", desc: `${mapped.cars.length} vehicles are ready for operation`, time: "6 hrs ago", dot: "bg-orange-500" },
   ];
@@ -757,7 +763,7 @@ export default function WasteCompanyDashboard() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
             {[
-              { label: "Total Drivers", value: mapped.drivers.length, sub: "Registered drivers", icon: <Users size={22} className="text-blue-600" />, iconBg: "bg-blue-100", valueColor: "text-blue-600", trend: "+12% this month" },
+              { label: "Total Drivers", value: companyDrivers.length, sub: "Registered drivers", icon: <Users size={22} className="text-blue-600" />, iconBg: "bg-blue-100", valueColor: "text-blue-600", trend: "+12% this month" },
               { label: "Vehicles Ready", value: mapped.cars.length, sub: "Fleet available", icon: <Truck size={22} className="text-green-600" />, iconBg: "bg-green-100", valueColor: "text-green-600", trend: "+5% vs yesterday" },
               { label: "Service Areas", value: mapped.serviceAreas.length, sub: "Zones covered", icon: <MapPin size={22} className="text-orange-500" />, iconBg: "bg-orange-100", valueColor: "text-orange-500", trend: "Active" },
             ].map((s) => (
@@ -872,7 +878,7 @@ export default function WasteCompanyDashboard() {
             <Card title="Company Overview" icon={<Building2 size={16} className="text-green-600" />}>
               <InfoRow label="District" value={companyDistrict?.name || application.district || "—"} />
               <InfoRow label="Service areas" value={mapped.serviceAreas.join(", ") || "—"} />
-              <InfoRow label="Drivers" value={String(mapped.drivers.length)} />
+              <InfoRow label="Drivers" value={String(companyDrivers.length)} />
               <InfoRow label="Vehicles" value={String(mapped.cars.length)} />
               {application.description && (
                 <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600 mt-1">
@@ -885,18 +891,17 @@ export default function WasteCompanyDashboard() {
 
           <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'drivers-section' ? 'hidden' : ''}`} id="drivers-section">
             <Card title="Driver Roster" icon={<Users size={16} className="text-blue-600" />}>
-              {mapped.drivers.length === 0 ? (
+              {companyDrivers.length === 0 ? (
                 <p className="text-sm text-gray-400">No drivers on record.</p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
-                  {mapped.drivers.map((driver, i) => (
-                    <div key={i} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
+                  {companyDrivers.map((driver) => (
+                    <div key={driver.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
                       <p className="font-semibold text-gray-900">{driver.name}</p>
-                      <p className="text-xs text-gray-500">{driver.email} • {driver.phone}</p>
-                      <p className="text-xs text-gray-500">License: {driver.licenseNumber || "N/A"} • ID: {driver.nationalId || "N/A"}</p>
-                      <p className="text-xs text-gray-500">Zone: {driver.zone} • Truck: {driver.truckId || "Unassigned"} • Exp: {driver.yearsOfExperience || "N/A"} yrs</p>
-                      <p className="text-xs text-gray-500">Emergency: {driver.emergencyContactName || "N/A"} ({driver.emergencyContactPhone || "N/A"})</p>
-                      <p className="text-xs text-gray-500">Address: {driver.address || "N/A"}</p>
+                      <p className="text-xs text-gray-500">{driver.email ?? ""} • {driver.phone}</p>
+                      <p className="text-xs text-gray-500">License: {driver.license_number || "N/A"} • ID: {driver.national_id || "N/A"}</p>
+                      <p className="text-xs text-gray-500">Zone: {driver.zone ?? "—"} • Truck: {driver.truck_id || "Unassigned"} • Exp: {driver.years_of_experience ?? "N/A"} yrs</p>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${driver.status === "active" ? "bg-green-100 text-green-700" : driver.status === "suspended" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>{driver.status ?? "active"}</span>
                     </div>
                   ))}
                 </div>
@@ -1155,8 +1160,8 @@ export default function WasteCompanyDashboard() {
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Driver</label>
                     <select value={assignmentDriver} onChange={(e) => setAssignmentDriver(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                       <option value="">Select driver</option>
-                      {mapped.drivers.map((driver, index) => (
-                        <option key={`${driver.name}-${index}`} value={driver.name}>{driver.name || `Driver ${index + 1}`}</option>
+                      {companyDrivers.map((driver) => (
+                        <option key={driver.id} value={driver.name}>{driver.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1677,7 +1682,7 @@ export default function WasteCompanyDashboard() {
                     <label className="block text-sm font-medium text-gray-700">Driver</label>
                     <select value={scheduleForm.driver} onChange={(e) => setScheduleForm((current) => ({ ...current, driver: e.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                       <option value="">Select driver</option>
-                      {mapped.drivers.map((driver, index) => <option key={`${driver.name || "driver"}-${index}`} value={driver.name || `Driver ${index + 1}`}>{driver.name || `Driver ${index + 1}`}</option>)}
+                      {companyDrivers.map((driver) => <option key={driver.id} value={driver.name}>{driver.name}</option>)}
                     </select>
                   </div>
 
