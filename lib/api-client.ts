@@ -92,6 +92,19 @@ export interface BackendCompanyProfile {
   updated_at?: string;
 }
 
+export interface BackendVehicle {
+  id: number;
+  company_id: number;
+  plate_number: string;
+  model: string;
+  year?: string;
+  capacity?: string;
+  assigned_zone?: string;
+  insurance_number?: string;
+  status?: string;
+  created_at?: string;
+}
+
 export interface BackendChatMessage {
   id: number;
   company_id: number;
@@ -137,6 +150,25 @@ export interface BackendNotification {
   type: "info" | "warning" | "success";
   read: boolean;
   created_at?: string;
+}
+
+export interface BackendHousehold {
+  id: number;
+  user_id: number;
+  district: string;
+  sector: string;
+  cell: string;
+  village: string;
+  street_address: string;
+  house_type: string;
+  residents: number;
+  notes?: string;
+  zone?: string;
+  status: string;
+  created_at?: string;
+  full_name: string;
+  email: string;
+  telephone: string;
 }
 
 export interface BackendDriver {
@@ -352,6 +384,12 @@ export const api = {
       district: string; sector: string; cell: string; village: string;
       street_address: string; house_type: string; residents: number; notes: string;
     }>) => apiFetch("/api/households/me", { method: "PUT", body: JSON.stringify(payload), auth: true }),
+
+    byDistrict: (district: string) =>
+      apiFetch<{ district: string; count: number; households: BackendHousehold[] }>(
+        `/api/households/district/${encodeURIComponent(district)}`,
+        { method: "GET", auth: true },
+      ),
   },
 
   companies: {
@@ -550,6 +588,31 @@ export const api = {
 
     remove: (companyId: number, messageId: number) =>
       apiFetch<{ message: string }>(`/api/chat/company/${companyId}/${messageId}`, {
+        method: "DELETE",
+        auth: true,
+      }),
+  },
+
+  vehicles: {
+    list: (companyId: number) =>
+      apiFetch<{ vehicles: BackendVehicle[] }>(`/api/vehicles/company/${companyId}`, { method: "GET", auth: true }),
+
+    add: (companyId: number, data: Omit<BackendVehicle, "id" | "company_id" | "created_at">) =>
+      apiFetch<{ message: string; vehicle: BackendVehicle }>(`/api/vehicles/company/${companyId}`, {
+        method: "POST",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    update: (companyId: number, vehicleId: number, data: Partial<Omit<BackendVehicle, "id" | "company_id" | "created_at">>) =>
+      apiFetch<{ message: string; vehicle: BackendVehicle }>(`/api/vehicles/company/${companyId}/${vehicleId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    remove: (companyId: number, vehicleId: number) =>
+      apiFetch<{ message: string }>(`/api/vehicles/company/${companyId}/${vehicleId}`, {
         method: "DELETE",
         auth: true,
       }),
