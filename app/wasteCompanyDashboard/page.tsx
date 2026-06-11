@@ -10,7 +10,7 @@ import {
   CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
 } from "lucide-react";
 import { isWasteCollectorRole } from "@/lib/company-application";
-import { api, type BackendCompanyProfile, type BackendDriver, type BackendComplaint, type BackendChatMessage, type BackendConversationSummary, getStoredUserInfo } from "@/lib/api-client";
+import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendChatMessage, type BackendConversationSummary, getStoredUserInfo } from "@/lib/api-client";
 import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
@@ -112,6 +112,17 @@ export default function WasteCompanyDashboard() {
   const [editDriverSaving, setEditDriverSaving] = useState(false);
   const [editDriverError, setEditDriverError] = useState("");
 
+  const [companyVehicles, setCompanyVehicles] = useState<BackendVehicle[]>([]);
+  const [addVehicleModal, setAddVehicleModal] = useState(false);
+  const [addVehicleForm, setAddVehicleForm] = useState({ plate_number: "", model: "", year: "", capacity: "", assigned_zone: "Kicukiro", insurance_number: "" });
+  const [addVehicleSaving, setAddVehicleSaving] = useState(false);
+  const [addVehicleError, setAddVehicleError] = useState("");
+  const [editVehicleModal, setEditVehicleModal] = useState(false);
+  const [editVehicleTarget, setEditVehicleTarget] = useState<BackendVehicle | null>(null);
+  const [editVehicleForm, setEditVehicleForm] = useState({ plate_number: "", model: "", year: "", capacity: "", assigned_zone: "Kicukiro", insurance_number: "" });
+  const [editVehicleSaving, setEditVehicleSaving] = useState(false);
+  const [editVehicleError, setEditVehicleError] = useState("");
+
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
     if (!token || !userInfo || !isWasteCollectorRole(userInfo.role)) {
@@ -144,6 +155,13 @@ export default function WasteCompanyDashboard() {
     if (!application?.id) return;
     api.drivers.list(application.id)
       .then(res => setCompanyDrivers(res.drivers))
+      .catch(() => {});
+  }, [application?.id]);
+
+  useEffect(() => {
+    if (!application?.id) return;
+    api.vehicles.list(application.id)
+      .then(res => setCompanyVehicles(res.vehicles))
       .catch(() => {});
   }, [application?.id]);
 
@@ -556,6 +574,85 @@ export default function WasteCompanyDashboard() {
     }
   };
 
+  const handleAddVehicle = async () => {
+    if (!application) return;
+    if (!addVehicleForm.plate_number.trim() || !addVehicleForm.model.trim()) {
+      setAddVehicleError("Plate number and model are required.");
+      return;
+    }
+    setAddVehicleSaving(true);
+    setAddVehicleError("");
+    try {
+      const res = await api.vehicles.add(application.id, {
+        plate_number: addVehicleForm.plate_number.trim(),
+        model: addVehicleForm.model.trim(),
+        year: addVehicleForm.year.trim() || undefined,
+        capacity: addVehicleForm.capacity.trim() || undefined,
+        assigned_zone: addVehicleForm.assigned_zone || undefined,
+        insurance_number: addVehicleForm.insurance_number.trim() || undefined,
+      });
+      setCompanyVehicles(prev => [...prev, res.vehicle]);
+      setAddVehicleModal(false);
+      setAddVehicleForm({ plate_number: "", model: "", year: "", capacity: "", assigned_zone: "Kicukiro", insurance_number: "" });
+    } catch (err) {
+      setAddVehicleError(err instanceof Error ? err.message : "Failed to add vehicle.");
+    } finally {
+      setAddVehicleSaving(false);
+    }
+  };
+
+  const openEditVehicle = (v: BackendVehicle) => {
+    setEditVehicleTarget(v);
+    setEditVehicleForm({
+      plate_number: v.plate_number,
+      model: v.model,
+      year: v.year ?? "",
+      capacity: v.capacity ?? "",
+      assigned_zone: v.assigned_zone ?? "Kicukiro",
+      insurance_number: v.insurance_number ?? "",
+    });
+    setEditVehicleError("");
+    setEditVehicleModal(true);
+  };
+
+  const handleEditVehicle = async () => {
+    if (!application || !editVehicleTarget) return;
+    if (!editVehicleForm.plate_number.trim() || !editVehicleForm.model.trim()) {
+      setEditVehicleError("Plate number and model are required.");
+      return;
+    }
+    setEditVehicleSaving(true);
+    setEditVehicleError("");
+    try {
+      const res = await api.vehicles.update(application.id, editVehicleTarget.id, {
+        plate_number: editVehicleForm.plate_number.trim(),
+        model: editVehicleForm.model.trim(),
+        year: editVehicleForm.year.trim() || undefined,
+        capacity: editVehicleForm.capacity.trim() || undefined,
+        assigned_zone: editVehicleForm.assigned_zone || undefined,
+        insurance_number: editVehicleForm.insurance_number.trim() || undefined,
+      });
+      setCompanyVehicles(prev => prev.map(v => v.id === editVehicleTarget.id ? res.vehicle : v));
+      setEditVehicleModal(false);
+      setEditVehicleTarget(null);
+    } catch (err) {
+      setEditVehicleError(err instanceof Error ? err.message : "Failed to update vehicle.");
+    } finally {
+      setEditVehicleSaving(false);
+    }
+  };
+
+  const handleDeleteVehicle = async (v: BackendVehicle) => {
+    if (!application) return;
+    if (!confirm(`Delete vehicle "${v.plate_number}"? This cannot be undone.`)) return;
+    try {
+      await api.vehicles.remove(application.id, v.id);
+      setCompanyVehicles(prev => prev.filter(x => x.id !== v.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to delete vehicle.");
+    }
+  };
+
   const handleDistrictSave = async () => {
     if (!application) return;
     if (!districtDraft.trim()) {
@@ -609,7 +706,7 @@ export default function WasteCompanyDashboard() {
   const activities = [
     { id: "1", title: "Drivers Updated", desc: `${companyDrivers.length} drivers available for dispatch`, time: "10 min ago", dot: "bg-green-500" },
     { id: "3", title: "Service Areas Set", desc: mapped.serviceAreas.join(", ") || "No zones selected", time: "5 hrs ago", dot: "bg-purple-500" },
-    { id: "4", title: "Fleet Ready", desc: `${mapped.cars.length} vehicles are ready for operation`, time: "6 hrs ago", dot: "bg-orange-500" },
+    { id: "4", title: "Fleet Ready", desc: `${companyVehicles.length} vehicles are ready for operation`, time: "6 hrs ago", dot: "bg-orange-500" },
   ];
 
   const quickActions = [
@@ -824,7 +921,7 @@ export default function WasteCompanyDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
             {[
               { label: "Total Drivers", value: companyDrivers.length, sub: "Registered drivers", icon: <Users size={22} className="text-blue-600" />, iconBg: "bg-blue-100", valueColor: "text-blue-600", trend: "+12% this month" },
-              { label: "Vehicles Ready", value: mapped.cars.length, sub: "Fleet available", icon: <Truck size={22} className="text-green-600" />, iconBg: "bg-green-100", valueColor: "text-green-600", trend: "+5% vs yesterday" },
+              { label: "Vehicles Ready", value: companyVehicles.length, sub: "Fleet available", icon: <Truck size={22} className="text-green-600" />, iconBg: "bg-green-100", valueColor: "text-green-600", trend: "+5% vs yesterday" },
               { label: "Service Areas", value: mapped.serviceAreas.length, sub: "Zones covered", icon: <MapPin size={22} className="text-orange-500" />, iconBg: "bg-orange-100", valueColor: "text-orange-500", trend: "Active" },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 hover:shadow-md transition">
@@ -939,7 +1036,7 @@ export default function WasteCompanyDashboard() {
               <InfoRow label="District" value={companyDistrict?.name || application.district || "—"} />
               <InfoRow label="Service areas" value={mapped.serviceAreas.join(", ") || "—"} />
               <InfoRow label="Drivers" value={String(companyDrivers.length)} />
-              <InfoRow label="Vehicles" value={String(mapped.cars.length)} />
+              <InfoRow label="Vehicles" value={String(companyVehicles.length)} />
               {application.description && (
                 <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-600 mt-1">
                   {application.description}
@@ -991,22 +1088,23 @@ export default function WasteCompanyDashboard() {
 
           <div className={`grid grid-cols-1 xl:grid-cols-2 gap-5 scroll-mt-28 ${activeSection !== 'top-section' && activeSection !== 'vehicles-section' ? 'hidden' : ''}`} id="vehicles-section">
             <Card title="Fleet / Vehicles" icon={<Car size={16} className="text-purple-600" />}>
-              {mapped.cars.length === 0 ? (
-                <p className="text-sm text-gray-400">No vehicles on record.</p>
+              {companyVehicles.length === 0 ? (
+                <p className="text-sm text-gray-400">No vehicles on record. Go to Settings to add vehicles.</p>
               ) : (
                 <div className="grid gap-3 md:grid-cols-2">
-                  {mapped.cars.map((car, i) => (
-                    <div key={i} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
-                      <p className="font-semibold text-gray-900">{car.plateNumber} — {car.model}</p>
-                      <p className="text-xs text-gray-500">Year: {car.year || "N/A"} • Capacity: {car.capacity || "N/A"} tons</p>
-                      <p className="text-xs text-gray-500">Zone: {car.assignedZone} • Insurance: {car.insuranceNumber || "N/A"}</p>
+                  {companyVehicles.map((v) => (
+                    <div key={v.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
+                      <p className="font-semibold text-gray-900">{v.plate_number} — {v.model}</p>
+                      <p className="text-xs text-gray-500">Year: {v.year || "N/A"} • Capacity: {v.capacity || "N/A"}</p>
+                      <p className="text-xs text-gray-500">Zone: {v.assigned_zone || "—"} • Insurance: {v.insurance_number || "N/A"}</p>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${v.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{v.status ?? "active"}</span>
                     </div>
                   ))}
                 </div>
               )}
-              <div className="pt-4 border-t border-gray-100 flex flex-wrap gap-3">
-                <button onClick={goToOnboarding} className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 transition">
-                  <Plus size={15} /> Add vehicle
+              <div className="pt-4 border-t border-gray-100">
+                <button onClick={() => scrollToSection("settings-section")} className="text-sm text-purple-700 hover:underline">
+                  Manage vehicles in Settings →
                 </button>
               </div>
             </Card>
@@ -1229,8 +1327,8 @@ export default function WasteCompanyDashboard() {
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Vehicle</label>
                     <select value={assignmentVehicle} onChange={(e) => setAssignmentVehicle(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                       <option value="">Select vehicle</option>
-                      {mapped.cars.map((car, index) => (
-                        <option key={`${car.plateNumber}-${index}`} value={car.plateNumber}>{car.plateNumber || `Vehicle ${index + 1}`}</option>
+                      {companyVehicles.map((v) => (
+                        <option key={v.id} value={v.plate_number}>{v.plate_number} — {v.model}</option>
                       ))}
                     </select>
                   </div>
@@ -1611,6 +1709,60 @@ export default function WasteCompanyDashboard() {
                 </div>
               )}
             </Card>
+
+            {/* Vehicle Management — same layout as drivers */}
+            <Card title="Settings — Vehicle Management" icon={<Car size={16} className="text-purple-600" />}>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm text-gray-500">{companyVehicles.length} vehicle{companyVehicles.length !== 1 ? "s" : ""} registered</p>
+                <button
+                  onClick={() => setAddVehicleModal(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-700 transition"
+                >
+                  <Plus size={15} /> Add Vehicle
+                </button>
+              </div>
+
+              {companyVehicles.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-400">
+                  No vehicles yet. Click &quot;Add Vehicle&quot; to get started.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-gray-100">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                      <tr>
+                        {["Plate", "Model", "Year", "Capacity", "Zone", "Insurance", "Status", "Actions"].map(h => (
+                          <th key={h} className="px-4 py-3 text-left whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {companyVehicles.map(v => (
+                        <tr key={v.id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{v.plate_number}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.model}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{v.year ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{v.capacity ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{v.assigned_zone ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{v.insurance_number ?? "—"}</td>
+                          <td className="px-4 py-3">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${v.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                              {v.status ?? "active"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button onClick={() => openEditVehicle(v)} className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition" title="Edit"><Edit3 size={14} /></button>
+                              <button onClick={() => void handleDeleteVehicle(v)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition" title="Delete"><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
           </div>
 
           {/* Complaint detail modal */}
@@ -1806,7 +1958,7 @@ export default function WasteCompanyDashboard() {
                     <label className="block text-sm font-medium text-gray-700">Vehicle</label>
                     <select value={scheduleForm.vehicle} onChange={(e) => setScheduleForm((current) => ({ ...current, vehicle: e.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
                       <option value="">Select vehicle</option>
-                      {mapped.cars.map((car, index) => <option key={`${car.plateNumber || "vehicle"}-${index}`} value={car.plateNumber || `Vehicle ${index + 1}`}>{car.plateNumber || `Vehicle ${index + 1}`}</option>)}
+                      {companyVehicles.map((v, index) => <option key={`${v.plate_number || "vehicle"}-${index}`} value={v.plate_number || `Vehicle ${index + 1}`}>{v.plate_number || `Vehicle ${index + 1}`}</option>)}
                     </select>
                   </div>
 
@@ -1916,6 +2068,104 @@ export default function WasteCompanyDashboard() {
               <button onClick={handleEditDriver} disabled={editDriverSaving} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 transition disabled:opacity-60">
                 {editDriverSaving && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
                 {editDriverSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editVehicleModal && editVehicleTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="font-bold text-gray-900">Edit Vehicle</h3>
+              <button onClick={() => { setEditVehicleModal(false); setEditVehicleError(""); }} className="rounded-lg p-1 hover:bg-gray-100 transition"><X size={18} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {editVehicleError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{editVehicleError}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Plate Number <span className="text-red-500">*</span></label>
+                  <input value={editVehicleForm.plate_number} onChange={e => setEditVehicleForm(f => ({ ...f, plate_number: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Model <span className="text-red-500">*</span></label>
+                  <input value={editVehicleForm.model} onChange={e => setEditVehicleForm(f => ({ ...f, model: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                  <input value={editVehicleForm.year} onChange={e => setEditVehicleForm(f => ({ ...f, year: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Capacity</label>
+                  <input value={editVehicleForm.capacity} onChange={e => setEditVehicleForm(f => ({ ...f, capacity: e.target.value }))} placeholder="e.g. 5 tons" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Insurance No.</label>
+                  <input value={editVehicleForm.insurance_number} onChange={e => setEditVehicleForm(f => ({ ...f, insurance_number: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Assigned Zone</label>
+                  <select value={editVehicleForm.assigned_zone} onChange={e => setEditVehicleForm(f => ({ ...f, assigned_zone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    {(mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera", "Bugesera", "Huye"]).map(z => <option key={z} value={z}>{z}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end border-t px-6 py-4">
+              <button onClick={() => { setEditVehicleModal(false); setEditVehicleError(""); }} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={handleEditVehicle} disabled={editVehicleSaving} className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition disabled:opacity-60">
+                {editVehicleSaving && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                {editVehicleSaving ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {addVehicleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b px-6 py-4">
+              <h3 className="font-bold text-gray-900">Add Vehicle</h3>
+              <button onClick={() => { setAddVehicleModal(false); setAddVehicleError(""); }} className="rounded-lg p-1 hover:bg-gray-100 transition"><X size={18} /></button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              {addVehicleError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{addVehicleError}</p>}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Plate Number <span className="text-red-500">*</span></label>
+                  <input value={addVehicleForm.plate_number} onChange={e => setAddVehicleForm(f => ({ ...f, plate_number: e.target.value }))} placeholder="e.g. RAB 123 A" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Model <span className="text-red-500">*</span></label>
+                  <input value={addVehicleForm.model} onChange={e => setAddVehicleForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g. Isuzu NPR" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Year</label>
+                  <input value={addVehicleForm.year} onChange={e => setAddVehicleForm(f => ({ ...f, year: e.target.value }))} placeholder="e.g. 2020" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Capacity</label>
+                  <input value={addVehicleForm.capacity} onChange={e => setAddVehicleForm(f => ({ ...f, capacity: e.target.value }))} placeholder="e.g. 5 tons" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Insurance No.</label>
+                  <input value={addVehicleForm.insurance_number} onChange={e => setAddVehicleForm(f => ({ ...f, insurance_number: e.target.value }))} placeholder="INS-2024-001" className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Assigned Zone</label>
+                  <select value={addVehicleForm.assigned_zone} onChange={e => setAddVehicleForm(f => ({ ...f, assigned_zone: e.target.value }))} className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    {(mapped.serviceAreas.length > 0 ? mapped.serviceAreas : ["Kicukiro", "Gasabo", "Nyarugenge", "Remera", "Bugesera", "Huye"]).map(z => <option key={z} value={z}>{z}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end border-t px-6 py-4">
+              <button onClick={() => { setAddVehicleModal(false); setAddVehicleError(""); }} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={handleAddVehicle} disabled={addVehicleSaving} className="inline-flex items-center gap-2 rounded-xl bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 transition disabled:opacity-60">
+                {addVehicleSaving && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
+                {addVehicleSaving ? "Saving..." : "Add Vehicle"}
               </button>
             </div>
           </div>
