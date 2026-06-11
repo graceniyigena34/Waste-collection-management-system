@@ -1,5 +1,4 @@
 "use client";
-import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Calendar, Route, CreditCard, Users, Truck, FileText, Bell, MessageCircle } from 'lucide-react';
@@ -13,6 +12,7 @@ export default function Sidebar() {
     { href: '/User-Dashboard/Route', icon: Route, label: 'Route' },
     { href: '/User-Dashboard/Payments', icon: CreditCard, label: 'Payments' },
     { href: '/User-Dashboard/Complaints', icon: FileText, label: 'Complaints' },
+    { href: '/User-Dashboard/RequestPickup', icon: Truck, label: 'Request Pickup' },
     { href: '/User-Dashboard/Notifications', icon: Bell, label: 'Notifications' },
     { href: '/User-Dashboard/Chat', icon: MessageCircle, label: 'Chat' },
     { href: '/User-Dashboard/Customer', icon: Users, label: 'Personal Info' },
