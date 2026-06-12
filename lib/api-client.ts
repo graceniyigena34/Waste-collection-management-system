@@ -212,6 +212,20 @@ export interface BackendDriverWithCompany extends BackendDriver {
   company_name?: string;
 }
 
+export interface BackendAssignment {
+  id: number;
+  company_id: number;
+  driver_id: number;
+  vehicle_id: number;
+  zone: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  driver_name?: string;
+  vehicle_plate?: string;
+  vehicle_model?: string;
+}
+
 export interface BackendCompanySchedule {
   id: number;
   company_id: number;
@@ -659,6 +673,28 @@ export const api = {
 
     remove: (id: number) =>
       apiFetch<{ message: string }>(`/api/pickup-requests/${id}`, { method: "DELETE", auth: true }),
+  },
+
+  assignments: {
+    list: (companyId: number) =>
+      apiFetch<{ assignments: BackendAssignment[] }>(`/api/assignments/company/${companyId}`, { method: "GET", auth: true }),
+
+    create: (data: { company_id: number; driver_id: number; vehicle_id: number; zone: string; notes?: string }) =>
+      apiFetch<{ message: string; assignment: BackendAssignment }>("/api/assignments", {
+        method: "POST",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    update: (id: number, data: { company_id: number; driver_id?: number; vehicle_id?: number; zone?: string; notes?: string }) =>
+      apiFetch<{ message: string; assignment: BackendAssignment }>(`/api/assignments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    remove: (id: number, companyId: number) =>
+      apiFetch<{ message: string }>(`/api/assignments/${id}?company_id=${companyId}`, { method: "DELETE", auth: true }),
   },
 
   vehicles: {

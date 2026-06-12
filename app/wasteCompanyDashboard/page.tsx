@@ -10,7 +10,7 @@ import {
   CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send, PackagePlus,
 } from "lucide-react";
 import { isWasteCollectorRole } from "@/lib/company-application";
-import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendPickupRequest, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, getStoredUserInfo } from "@/lib/api-client";
+import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendPickupRequest, type BackendAssignment, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, getStoredUserInfo } from "@/lib/api-client";
 import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
@@ -52,10 +52,20 @@ export default function WasteCompanyDashboard() {
   const userInfo = getStoredUserInfo();
   const [application, setApplication] = useState<BackendCompanyProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [assignmentDriver, setAssignmentDriver] = useState("");
-  const [assignmentVehicle, setAssignmentVehicle] = useState("");
+  const [assignmentDriverId, setAssignmentDriverId] = useState("");
+  const [assignmentVehicleId, setAssignmentVehicleId] = useState("");
   const [assignmentZone, setAssignmentZone] = useState("");
-  const [assignments, setAssignments] = useState<Array<{ driver: string; vehicle: string; zone: string; createdAt: string }>>([]);
+  const [assignmentNotes, setAssignmentNotes] = useState("");
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [assignmentError, setAssignmentError] = useState("");
+  const [assignments, setAssignments] = useState<BackendAssignment[]>([]);
+  const [editAssignmentTarget, setEditAssignmentTarget] = useState<BackendAssignment | null>(null);
+  const [editAssignmentDriverId, setEditAssignmentDriverId] = useState("");
+  const [editAssignmentVehicleId, setEditAssignmentVehicleId] = useState("");
+  const [editAssignmentZone, setEditAssignmentZone] = useState("");
+  const [editAssignmentNotes, setEditAssignmentNotes] = useState("");
+  const [editAssignmentSaving, setEditAssignmentSaving] = useState(false);
+  const [editAssignmentError, setEditAssignmentError] = useState("");
   const [districtDraft, setDistrictDraft] = useState("");
   const [districtSaving, setDistrictSaving] = useState(false);
   const [districtMessage, setDistrictMessage] = useState("");
@@ -170,6 +180,9 @@ export default function WasteCompanyDashboard() {
     if (!application?.id) return;
     api.drivers.list(application.id)
       .then(res => setCompanyDrivers(res.drivers))
+      .catch(() => {});
+    api.assignments.list(application.id)
+      .then(res => setAssignments(res.assignments))
       .catch(() => {});
   }, [application?.id]);
 
@@ -862,24 +875,56 @@ export default function WasteCompanyDashboard() {
     completed: scheduleTasks.filter((task) => task.status === "Completed").length,
   };
 
-  const handleCreateAssignment = () => {
-    if (!assignmentDriver || !assignmentVehicle || !assignmentZone) {
+  const handleCreateAssignment = async () => {
+    if (!application?.id || !assignmentDriverId || !assignmentVehicleId || !assignmentZone) {
+      setAssignmentError("Please select a driver, vehicle and zone.");
       return;
     }
-
-    setAssignments((current) => [
-      {
-        driver: assignmentDriver,
-        vehicle: assignmentVehicle,
+    setAssignmentSaving(true);
+    setAssignmentError("");
+    try {
+      const res = await api.assignments.create({
+        company_id: application.id,
+        driver_id: Number(assignmentDriverId),
+        vehicle_id: Number(assignmentVehicleId),
         zone: assignmentZone,
-        createdAt: new Date().toLocaleString(),
-      },
-      ...current,
-    ]);
+        notes: assignmentNotes.trim() || undefined,
+      });
+      setAssignments(prev => [res.assignment, ...prev]);
+      setAssignmentDriverId("");
+      setAssignmentVehicleId("");
+      setAssignmentZone("");
+      setAssignmentNotes("");
+    } catch (err) {
+      setAssignmentError(err instanceof Error ? err.message : "Failed to save assignment.");
+    } finally {
+      setAssignmentSaving(false);
+    }
+  };
 
-    setAssignmentDriver("");
-    setAssignmentVehicle("");
-    setAssignmentZone("");
+  const handleEditAssignment = async () => {
+    if (!editAssignmentTarget || !application?.id) return;
+    if (!editAssignmentDriverId || !editAssignmentVehicleId || !editAssignmentZone) {
+      setEditAssignmentError("Please select a driver, vehicle and zone.");
+      return;
+    }
+    setEditAssignmentSaving(true);
+    setEditAssignmentError("");
+    try {
+      const res = await api.assignments.update(editAssignmentTarget.id, {
+        company_id: application.id,
+        driver_id: Number(editAssignmentDriverId),
+        vehicle_id: Number(editAssignmentVehicleId),
+        zone: editAssignmentZone,
+        notes: editAssignmentNotes.trim() || undefined,
+      });
+      setAssignments(prev => prev.map(a => a.id === editAssignmentTarget.id ? res.assignment : a));
+      setEditAssignmentTarget(null);
+    } catch (err) {
+      setEditAssignmentError(err instanceof Error ? err.message : "Failed to update assignment.");
+    } finally {
+      setEditAssignmentSaving(false);
+    }
   };
 
   return (
@@ -1335,35 +1380,54 @@ export default function WasteCompanyDashboard() {
                 <p className="text-sm text-gray-600">
                   Assign a driver to a vehicle and zone. This is the place to manage dispatch planning for daily work.
                 </p>
+                {assignmentError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 rounded-xl">{assignmentError}</div>
+                )}
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Driver</label>
-                    <select value={assignmentDriver} onChange={(e) => setAssignmentDriver(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <select value={assignmentDriverId} onChange={(e) => setAssignmentDriverId(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
                       <option value="">Select driver</option>
                       {companyDrivers.map((driver) => (
-                        <option key={driver.id} value={driver.name}>{driver.name}</option>
+                        <option key={driver.id} value={driver.id}>{driver.name}</option>
                       ))}
                     </select>
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Vehicle</label>
-                    <select value={assignmentVehicle} onChange={(e) => setAssignmentVehicle(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <select value={assignmentVehicleId} onChange={(e) => setAssignmentVehicleId(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
                       <option value="">Select vehicle</option>
                       {companyVehicles.map((v) => (
-                        <option key={v.id} value={v.plate_number}>{v.plate_number} — {v.model}</option>
+                        <option key={v.id} value={v.id}>{v.plate_number} — {v.model}</option>
                       ))}
                     </select>
                   </div>
                   <div className="md:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Zone</label>
-                    <select value={assignmentZone} onChange={(e) => setAssignmentZone(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <select value={assignmentZone} onChange={(e) => setAssignmentZone(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
                       <option value="">Select zone</option>
                       {assignmentZones.map((zone) => <option key={zone}>{zone}</option>)}
                     </select>
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">Notes (optional)</label>
+                    <input
+                      type="text"
+                      value={assignmentNotes}
+                      onChange={e => setAssignmentNotes(e.target.value)}
+                      placeholder="e.g. Morning shift, heavy loads..."
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
                 </div>
-                <button onClick={handleCreateAssignment} className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition">
-                  <Plus size={15} /> Save assignment
+                <button
+                  onClick={() => void handleCreateAssignment()}
+                  disabled={assignmentSaving}
+                  className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition disabled:opacity-60"
+                >
+                  {assignmentSaving
+                    ? <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> Saving…</>
+                    : <><Plus size={15} /> Save assignment</>}
                 </button>
               </div>
             </Card>
@@ -1373,12 +1437,45 @@ export default function WasteCompanyDashboard() {
                 <p className="text-sm text-gray-400">No assignments saved yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {assignments.map((assignment, index) => (
-                    <div key={`${assignment.driver}-${index}`} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
-                      <p className="font-semibold text-gray-900">{assignment.driver}</p>
-                      <p className="text-xs text-gray-500">Vehicle: {assignment.vehicle}</p>
-                      <p className="text-xs text-gray-500">Zone: {assignment.zone}</p>
-                      <p className="text-[11px] text-gray-400">Saved {assignment.createdAt}</p>
+                  {assignments.map((a) => (
+                    <div key={a.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900">{a.driver_name ?? `Driver #${a.driver_id}`}</p>
+                          <p className="text-xs text-gray-500">Vehicle: {a.vehicle_plate ?? `#${a.vehicle_id}`}{a.vehicle_model ? ` — ${a.vehicle_model}` : ""}</p>
+                          <p className="text-xs text-gray-500">Zone: {a.zone}</p>
+                          {a.notes && <p className="text-xs text-gray-400 italic">"{a.notes}"</p>}
+                          <p className="text-[11px] text-gray-400">
+                            Saved {a.created_at ? new Date(a.created_at).toLocaleString() : "—"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditAssignmentTarget(a);
+                              setEditAssignmentDriverId(String(a.driver_id));
+                              setEditAssignmentVehicleId(String(a.vehicle_id));
+                              setEditAssignmentZone(a.zone);
+                              setEditAssignmentNotes(a.notes ?? "");
+                              setEditAssignmentError("");
+                            }}
+                            className="px-2.5 py-1 text-teal-700 border border-teal-200 rounded-lg text-xs font-medium hover:bg-teal-50 transition flex items-center gap-1"
+                          >
+                            <Edit3 size={11} /> Edit
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!application?.id) return;
+                              setAssignments(prev => prev.filter(x => x.id !== a.id));
+                              try { await api.assignments.remove(a.id, application.id); }
+                              catch { setAssignments(prev => [a, ...prev]); }
+                            }}
+                            className="px-2.5 py-1 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-50 transition flex items-center gap-1"
+                          >
+                            <Trash2 size={11} /> Delete
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -2101,6 +2198,84 @@ export default function WasteCompanyDashboard() {
                       className="flex-1 py-2 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition disabled:opacity-60 flex items-center justify-center gap-2"
                     >
                       {respondSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> Sending…</> : "Send Response"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit assignment modal */}
+          {editAssignmentTarget && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b">
+                  <h3 className="font-bold text-gray-800">Edit Assignment</h3>
+                  <button onClick={() => setEditAssignmentTarget(null)} disabled={editAssignmentSaving}>
+                    <X size={20} className="text-gray-400" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  {editAssignmentError && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 rounded-xl">{editAssignmentError}</div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Driver</label>
+                    <select
+                      value={editAssignmentDriverId}
+                      onChange={e => setEditAssignmentDriverId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="">Select driver</option>
+                      {companyDrivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Vehicle</label>
+                    <select
+                      value={editAssignmentVehicleId}
+                      onChange={e => setEditAssignmentVehicleId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="">Select vehicle</option>
+                      {companyVehicles.map(v => <option key={v.id} value={v.id}>{v.plate_number} — {v.model}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Zone</label>
+                    <select
+                      value={editAssignmentZone}
+                      onChange={e => setEditAssignmentZone(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="">Select zone</option>
+                      {assignmentZones.map(zone => <option key={zone}>{zone}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optional)</label>
+                    <input
+                      type="text"
+                      value={editAssignmentNotes}
+                      onChange={e => setEditAssignmentNotes(e.target.value)}
+                      placeholder="e.g. Morning shift..."
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setEditAssignmentTarget(null)}
+                      disabled={editAssignmentSaving}
+                      className="flex-1 py-2 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => void handleEditAssignment()}
+                      disabled={editAssignmentSaving}
+                      className="flex-1 py-2 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 transition disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {editAssignmentSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> Saving…</> : "Save Changes"}
                     </button>
                   </div>
                 </div>
