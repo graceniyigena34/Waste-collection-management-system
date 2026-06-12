@@ -3,18 +3,9 @@
 import { useState, useEffect } from "react";
 import {
   Truck, CalendarDays, Clock, CheckCircle2, Loader2,
-  AlertCircle, ChevronRight, Trash2, Recycle, Package,
-  Leaf, Zap, X,
+  AlertCircle, ChevronRight, X,
 } from "lucide-react";
 import { api, type BackendComplaint } from "@/lib/api-client";
-
-const WASTE_TYPES = [
-  { label: "General Waste", icon: Trash2, color: "bg-gray-100 text-gray-700 border-gray-300" },
-  { label: "Recyclables", icon: Recycle, color: "bg-blue-50 text-blue-700 border-blue-300" },
-  { label: "Bulky Items", icon: Package, color: "bg-orange-50 text-orange-700 border-orange-300" },
-  { label: "Organic Waste", icon: Leaf, color: "bg-green-50 text-green-700 border-green-300" },
-  { label: "Hazardous Waste", icon: Zap, color: "bg-red-50 text-red-700 border-red-300" },
-];
 
 const TIME_SLOTS = ["06:00 – 09:00", "09:00 – 12:00", "12:00 – 15:00", "15:00 – 18:00"];
 
@@ -30,7 +21,6 @@ function fmt(d?: string) {
 }
 
 export default function RequestPickupPage() {
-  const [wasteType, setWasteType] = useState("");
   const [date, setDate] = useState("");
   const [timeSlot, setTimeSlot] = useState("");
   const [notes, setNotes] = useState("");
@@ -44,23 +34,20 @@ export default function RequestPickupPage() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  // Load previous pickup requests
   useEffect(() => {
     api.complaints.me()
       .then(data => setRequests(data.filter(c => c.issue_type === "Pickup Request")))
-      .catch(() => {/* silent */})
+      .catch(() => {})
       .finally(() => setLoadingHistory(false));
   }, []);
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    if (!wasteType) { setSubmitError("Please select a waste type."); return; }
     if (!date) { setSubmitError("Please select a preferred date."); return; }
     setSubmitError("");
     setSubmitting(true);
 
     const description = [
-      `Waste type: ${wasteType}`,
       `Preferred date: ${date}`,
       timeSlot ? `Preferred time: ${timeSlot}` : null,
       notes.trim() ? `Notes: ${notes.trim()}` : null,
@@ -74,7 +61,7 @@ export default function RequestPickupPage() {
       });
       setRequests(prev => [res.complaint, ...prev]);
       setSuccess(true);
-      setWasteType(""); setDate(""); setTimeSlot(""); setNotes(""); setPriority("Medium");
+      setDate(""); setTimeSlot(""); setNotes(""); setPriority("Medium");
       setTimeout(() => setSuccess(false), 5000);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to submit request. Please try again.");
@@ -97,7 +84,6 @@ export default function RequestPickupPage() {
     }
   };
 
-  // Min date = today
   const today = new Date().toISOString().split("T")[0];
 
   return (
@@ -138,30 +124,6 @@ export default function RequestPickupPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-
-          {/* Waste type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Waste Type <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {WASTE_TYPES.map(({ label, icon: Icon, color }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setWasteType(label)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
-                    wasteType === label
-                      ? "border-green-600 bg-green-50 text-green-800 shadow-sm"
-                      : `border ${color} hover:shadow-sm`
-                  }`}
-                >
-                  <Icon size={16} />
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Date + Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -266,9 +228,7 @@ export default function RequestPickupPage() {
         ) : (
           <div className="divide-y divide-gray-50">
             {requests.map(r => {
-              // Parse description fields back out for display
               const lines = r.description.split("\n");
-              const wasteTypeLine = lines.find(l => l.startsWith("Waste type:"))?.replace("Waste type: ", "") ?? "";
               const dateLine = lines.find(l => l.startsWith("Preferred date:"))?.replace("Preferred date: ", "") ?? "";
               const timeLine = lines.find(l => l.startsWith("Preferred time:"))?.replace("Preferred time: ", "") ?? "";
               const notesLine = lines.find(l => l.startsWith("Notes:"))?.replace("Notes: ", "") ?? "";
@@ -278,7 +238,7 @@ export default function RequestPickupPage() {
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex items-center gap-2">
                       <Truck size={16} className="text-green-600 flex-shrink-0" />
-                      <p className="font-semibold text-gray-800 text-sm">{wasteTypeLine || "Pickup Request"}</p>
+                      <p className="font-semibold text-gray-800 text-sm">Pickup Request</p>
                     </div>
                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${statusColor[r.status] ?? "bg-gray-100 text-gray-600"}`}>
                       {r.status}
