@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import {
   CreditCard, Calendar, CheckCircle, Clock, ArrowRight,
-  Smartphone, Building2, Banknote, ChevronRight, X,
-  Shield, AlertCircle, Check, Loader2, Receipt, TrendingUp,
+  Smartphone, Building2, ChevronRight, X,
+  Shield, Check, Loader2, Receipt, TrendingUp,
 } from 'lucide-react';
 
 /* ── Types ── */
@@ -178,7 +178,7 @@ export default function PaymentsPage() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'Paid This Year', value: `${totalPaidYear.toLocaleString()} RWF`, icon: <TrendingUp size={16} className="text-green-600" />, bg: 'bg-green-50' },
           { label: 'Next Due Date', value: nextDueDate, icon: <Calendar size={16} className="text-blue-600" />, bg: 'bg-blue-50' },

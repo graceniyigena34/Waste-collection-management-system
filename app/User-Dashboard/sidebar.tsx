@@ -1,28 +1,41 @@
 "use client";
-import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, Route, CreditCard, Users, Truck, FileText, Bell, MessageCircle } from 'lucide-react';
+import { Home, Calendar, CreditCard, Users, Truck, FileText, Bell, MessageCircle, X } from 'lucide-react';
 
-export default function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export default function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
 
   const navItems = [
     { href: '/User-Dashboard', icon: Home, label: 'Home' },
     { href: '/User-Dashboard/Schedule', icon: Calendar, label: 'Schedule' },
-    { href: '/User-Dashboard/Route', icon: Route, label: 'Route' },
     { href: '/User-Dashboard/Payments', icon: CreditCard, label: 'Payments' },
     { href: '/User-Dashboard/Complaints', icon: FileText, label: 'Complaints' },
+    { href: '/User-Dashboard/RequestPickup', icon: Truck, label: 'Request Pickup' },
     { href: '/User-Dashboard/Notifications', icon: Bell, label: 'Notifications' },
     { href: '/User-Dashboard/Chat', icon: MessageCircle, label: 'Chat' },
     { href: '/User-Dashboard/Customer', icon: Users, label: 'Personal Info' },
   ];
 
   return (
-    <div className="w-64 bg-gradient-to-b from-green-800 to-green-900 text-white flex flex-col">
-      <div className="p-6 flex items-center gap-3 border-b border-green-700">
-        <Truck size={28} className="text-green-300 flex-shrink-0" />
-        <span className="text-xl font-bold">EcoTrack</span>
+    <div className="w-64 bg-gradient-to-b from-green-800 to-green-900 text-white flex flex-col h-full">
+      <div className="p-5 flex items-center justify-between border-b border-green-700">
+        <div className="flex items-center gap-3">
+          <Truck size={26} className="text-green-300 flex-shrink-0" />
+          <span className="text-xl font-bold">EcoTrack</span>
+        </div>
+        {/* Close button — mobile only */}
+        <button
+          onClick={onClose}
+          className="lg:hidden p-1.5 rounded-lg hover:bg-white/20 transition"
+          aria-label="Close menu"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       <nav className="p-4 flex-1 overflow-y-auto">

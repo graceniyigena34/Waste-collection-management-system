@@ -6,6 +6,7 @@ import AboutSection from "@/components/AboutSection";
 import Servicepage from "@/components/Servicepage";
 import ContactSection from "@/components/ContactSection";
 import Footer from "@/components/Footer";
+import { LanguageProvider } from "@/lib/language-context";
 
 
 export default function Home() {
@@ -46,19 +47,21 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background dark:bg-gray-900 text-foreground transition-colors duration-300">
-      <Header
-        activeSection={activeSection}
-        onThemeToggle={toggleTheme}
-        isDarkMode={isDarkMode}
-      />
-      <main>
-        <HomeSection />
-        <AboutSection />
-        <Servicepage />
-        <ContactSection />
-      </main>
-      <Footer />
-    </div>
+    <LanguageProvider>
+      <div className="min-h-screen bg-background dark:bg-gray-900 text-foreground transition-colors duration-300">
+        <Header
+          activeSection={activeSection}
+          onThemeToggle={toggleTheme}
+          isDarkMode={isDarkMode}
+        />
+        <main>
+          <HomeSection />
+          <AboutSection />
+          <Servicepage />
+          <ContactSection />
+        </main>
+        <Footer />
+      </div>
+    </LanguageProvider>
   );
 }

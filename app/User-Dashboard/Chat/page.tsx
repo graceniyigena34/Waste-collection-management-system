@@ -33,6 +33,7 @@ export default function ChatPage() {
   const [company, setCompany] = useState<BackendCompanyProfile | null>(null);
   const [companyLoading, setCompanyLoading] = useState(true);
   const [companyError, setCompanyError] = useState("");
+  const [companyNotice, setCompanyNotice] = useState("");
 
   const [messages, setMessages] = useState<BackendChatMessage[]>([]);
   const [msgLoading, setMsgLoading] = useState(false);
@@ -56,21 +57,38 @@ export default function ChatPage() {
     } catch { return null; }
   })();
 
-  // ── Load company ──────────────────────────────────────────────────────────
+  // ── Load company for this citizen's district ──────────────────────────────
   useEffect(() => {
     const load = async () => {
       setCompanyLoading(true);
       setCompanyError("");
       try {
-        const hraw = typeof window !== "undefined" ? localStorage.getItem("household_details") : null;
-        const district = hraw ? (JSON.parse(hraw) as { district?: string }).district ?? "" : "";
+        // Fetch the citizen's household to get their registered district
+        let district = "";
+        try {
+          const household = await api.households.me();
+          district = household.district ?? "";
+        } catch {
+          // No household yet — will fall back to first approved company
+        }
+
         const res = await api.companies.all(100, 0);
         const approved = res.data.filter(c => c.status === "approved");
+
         const match = district
-          ? (approved.find(c => c.district?.toLowerCase() === district.toLowerCase()) ?? approved[0])
-          : approved[0];
-        if (match) setCompany(match);
-        else setCompanyError("No waste company is available in your area yet.");
+          ? (approved.find(c => c.district?.toLowerCase() === district.toLowerCase()) ?? null)
+          : null;
+
+        if (match) {
+          setCompany(match);
+        } else if (approved.length > 0) {
+          setCompany(approved[0]);
+          if (district) {
+            setCompanyNotice(`No company is registered for ${district} yet. Showing the nearest available company.`);
+          }
+        } else {
+          setCompanyError("No waste company is available in your area yet.");
+        }
       } catch {
         setCompanyError("Could not load company. Please refresh.");
       } finally {
@@ -251,12 +269,18 @@ export default function ChatPage() {
               </div>
             </div>
 
-            <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
-              <p className="text-xs text-blue-700 font-medium">💬 Direct support</p>
-              <p className="text-xs text-blue-600 mt-1">
-                Ask about your collection schedule, report issues, or get help with your service.
-              </p>
-            </div>
+            {companyNotice ? (
+              <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
+                <p className="text-xs text-amber-700">{companyNotice}</p>
+              </div>
+            ) : (
+              <div className="rounded-xl bg-blue-50 border border-blue-100 p-3">
+                <p className="text-xs text-blue-700 font-medium">Direct support</p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Ask about your collection schedule, report issues, or get help with your service.
+                </p>
+              </div>
+            )}
           </div>
         ) : null}
       </div>

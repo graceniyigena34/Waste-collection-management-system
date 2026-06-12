@@ -7,7 +7,7 @@ import {
   Car, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
   Clock, AlertTriangle, Bell, Plus,
-  CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send,
+  CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send, PackagePlus,
 } from "lucide-react";
 import { isWasteCollectorRole } from "@/lib/company-application";
 import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, getStoredUserInfo } from "@/lib/api-client";
@@ -737,6 +737,7 @@ export default function WasteCompanyDashboard() {
     { label: "Assignment", icon: Route, color: "text-teal-600 bg-teal-50 hover:bg-teal-100", target: "assignment-section" },
     { label: "Schedule", icon: CalendarDays, color: "text-green-700 bg-green-50 hover:bg-green-100", target: "schedule-section" },
     { label: "Complaints", icon: MessageSquare, color: "text-red-600 bg-red-50 hover:bg-red-100", target: "complaints-section" },
+    { label: "Pickup Requests", icon: PackagePlus, color: "text-amber-600 bg-amber-50 hover:bg-amber-100", target: "pickup-requests-section" },
     { label: "Chat", icon: MessageCircle, color: "text-blue-600 bg-blue-50 hover:bg-blue-100", target: "chat-section" },
     { label: "Citizens", icon: Building2, color: "text-emerald-600 bg-emerald-50 hover:bg-emerald-100", target: "citizens-section" },
     { label: "Settings", icon: Settings, color: "text-gray-600 bg-gray-50 hover:bg-gray-100", target: "settings-section" },
@@ -859,6 +860,7 @@ export default function WasteCompanyDashboard() {
             { label: "Assignment", icon: Route, target: "assignment-section" },
             { label: "Schedule", icon: CalendarDays, target: "schedule-section" },
             { label: "Complaints", icon: MessageSquare, target: "complaints-section" },
+            { label: "Pickup Requests", icon: PackagePlus, target: "pickup-requests-section" },
             { label: "Chat", icon: MessageCircle, target: "chat-section" },
             { label: "Citizens", icon: Building2, target: "citizens-section" },
             { label: "Settings", icon: Settings, target: "settings-section" },
@@ -1426,6 +1428,161 @@ export default function WasteCompanyDashboard() {
                   ))}
                 </div>
               )}
+            </Card>
+          </div>
+
+          {/* ── Pickup Requests Section ── */}
+          <div className={`scroll-mt-28 ${activeSection !== "top-section" && activeSection !== "pickup-requests-section" ? "hidden" : ""}`} id="pickup-requests-section">
+            <Card
+              title={`Pickup Requests — ${companyDistrict?.name || application.district || "Your District"}`}
+              icon={<PackagePlus size={16} className="text-amber-600" />}
+            >
+              {/* Stats row */}
+              {(() => {
+                const pickups = complaints.filter(c => c.issue_type === "Pickup Request");
+                const pending = pickups.filter(c => c.status === "Pending");
+                const inProgress = pickups.filter(c => c.status === "In Progress");
+                const resolved = pickups.filter(c => c.status === "Resolved");
+                return (
+                  <>
+                    <div className="grid grid-cols-4 gap-3 mb-4">
+                      {[
+                        { label: "Total", value: pickups.length, color: "text-amber-600 bg-amber-50" },
+                        { label: "New", value: pending.length, color: "text-orange-600 bg-orange-50" },
+                        { label: "In Progress", value: inProgress.length, color: "text-blue-600 bg-blue-50" },
+                        { label: "Completed", value: resolved.length, color: "text-green-600 bg-green-50" },
+                      ].map(s => (
+                        <div key={s.label} className={`${s.color} rounded-xl p-3 text-center`}>
+                          <p className="text-xl font-bold">{s.value}</p>
+                          <p className="text-xs">{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {complaintsLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-amber-500" />
+                      </div>
+                    ) : complaintsError ? (
+                      <p className="text-sm text-red-500">{complaintsError}</p>
+                    ) : !application.district ? (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                        Set your working district to see pickup requests from citizens in your area.
+                      </div>
+                    ) : pickups.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+                        <PackagePlus size={32} className="mx-auto mb-2 opacity-30" />
+                        No pickup requests yet from citizens in {companyDistrict?.name || application.district}.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {pickups.sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()).map(c => {
+                          // Parse structured description from the citizen's form
+                          const lines = c.description.split("\n");
+                          const wasteType = lines.find(l => l.startsWith("Waste type:"))?.replace("Waste type: ", "") ?? "";
+                          const prefDate = lines.find(l => l.startsWith("Preferred date:"))?.replace("Preferred date: ", "") ?? "";
+                          const prefTime = lines.find(l => l.startsWith("Preferred time:"))?.replace("Preferred time: ", "") ?? "";
+                          const notes = lines.find(l => l.startsWith("Notes:"))?.replace("Notes: ", "") ?? "";
+
+                          return (
+                            <div key={c.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex-1 min-w-0">
+                                  {/* Header row */}
+                                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <span className="font-mono text-xs text-gray-400">#{c.id}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                      c.priority === "Urgent" ? "bg-red-100 text-red-700" :
+                                      c.priority === "High" ? "bg-orange-100 text-orange-700" :
+                                      c.priority === "Medium" ? "bg-yellow-100 text-yellow-700" :
+                                      "bg-green-100 text-green-700"
+                                    }`}>{c.priority}</span>
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                      c.status === "Resolved" ? "bg-green-100 text-green-700" :
+                                      c.status === "In Progress" ? "bg-blue-100 text-blue-700" :
+                                      "bg-yellow-100 text-yellow-700"
+                                    }`}>{c.status}</span>
+                                    {wasteType && (
+                                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                                        {wasteType}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Citizen info */}
+                                  <p className="font-semibold text-gray-900 text-sm">{c.full_name ?? "Unknown citizen"}</p>
+                                  <p className="text-xs text-gray-500">{c.zone ?? "—"}</p>
+
+                                  {/* Pickup details */}
+                                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                                    {prefDate && (
+                                      <span className="flex items-center gap-1">
+                                        <CalendarDays size={11} className="text-amber-500" /> {prefDate}
+                                      </span>
+                                    )}
+                                    {prefTime && (
+                                      <span className="flex items-center gap-1">
+                                        <Clock size={11} className="text-amber-500" /> {prefTime}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {notes && (
+                                    <p className="text-xs text-gray-500 mt-1.5 italic">"{notes}"</p>
+                                  )}
+
+                                  {c.assigned_to && (
+                                    <p className="text-xs text-green-700 mt-1">Assigned driver: {c.assigned_to}</p>
+                                  )}
+                                  {c.resolution_note && (
+                                    <p className="text-xs text-blue-700 mt-1 bg-blue-50 rounded px-2 py-1">Response: {c.resolution_note}</p>
+                                  )}
+
+                                  <p className="text-xs text-gray-400 mt-1">
+                                    Submitted: {c.created_at ? new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                                  </p>
+                                </div>
+
+                                <div className="flex flex-col gap-2 flex-shrink-0">
+                                  <button
+                                    onClick={() => setViewedComplaint(c)}
+                                    className="px-3 py-1.5 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-50 transition flex items-center gap-1"
+                                  >
+                                    <Eye size={12} /> View
+                                  </button>
+                                  {c.status !== "Resolved" && (
+                                    <button
+                                      onClick={() => {
+                                        setRespondTarget(c);
+                                        setRespondNote(c.resolution_note ?? "");
+                                        setRespondStatus("In Progress");
+                                        setRespondError("");
+                                      }}
+                                      className="px-3 py-1.5 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium hover:bg-amber-50 transition flex items-center gap-1"
+                                    >
+                                      <CheckCircle2 size={12} /> Confirm
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={async () => {
+                                      setComplaints(prev => prev.filter(x => x.id !== c.id));
+                                      try { await api.complaints.remove(c.id); }
+                                      catch { setComplaints(prev => [c, ...prev].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())); }
+                                    }}
+                                    className="px-3 py-1.5 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-50 transition flex items-center gap-1"
+                                  >
+                                    <Trash2 size={12} /> Dismiss
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </Card>
           </div>
 
