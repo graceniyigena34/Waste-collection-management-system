@@ -167,7 +167,7 @@ export default function PersonalInfoPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
           {[
             { label: 'Account ID', value: user?.id ? `#${user.id}` : '—' },
             { label: 'Role', value: roleLabel(user?.role) },

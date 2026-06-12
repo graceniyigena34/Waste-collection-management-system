@@ -85,7 +85,7 @@ export default function SchedulePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {[
           { label: 'Upcoming', value: upcoming.length, icon: <Calendar size={16} className="text-blue-600" />, bg: 'bg-blue-50' },
           { label: 'Completed', value: completed, icon: <CheckCircle size={16} className="text-green-600" />, bg: 'bg-green-50' },
