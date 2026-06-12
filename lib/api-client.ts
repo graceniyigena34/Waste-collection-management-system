@@ -24,6 +24,7 @@ export interface BackendAuthUser {
   id: number;
   full_name: string;
   email: string;
+  telephone?: string;
   role: BackendRole;
   created_at?: string;
 }
@@ -397,7 +398,7 @@ export const api = {
       residents?: number;
       notes?: string;
     }) => apiFetch("/api/households", { method: "POST", body: JSON.stringify(payload), auth: true }),
-    me: () => apiFetch("/api/households/me", { method: "GET", auth: true }),
+    me: () => apiFetch<BackendHousehold>("/api/households/me", { method: "GET", auth: true }),
 
     update: (payload: Partial<{
       district: string; sector: string; cell: string; village: string;
