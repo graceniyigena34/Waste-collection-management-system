@@ -447,6 +447,16 @@ export const api = {
       ),
 
     all: () => apiFetch<BackendHousehold[]>("/api/households", { method: "GET", auth: true }),
+
+    adminUpdate: (id: number, data: Partial<Omit<BackendHousehold, "id" | "user_id" | "created_at" | "full_name" | "email" | "telephone">>) =>
+      apiFetch<{ message: string; household: BackendHousehold }>(`/api/households/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    adminDelete: (id: number) =>
+      apiFetch<{ message: string }>(`/api/households/${id}`, { method: "DELETE", auth: true }),
   },
 
   companies: {
