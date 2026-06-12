@@ -3,25 +3,17 @@
 import { useState, useEffect } from "react";
 import {
   Truck, CalendarDays, Clock, CheckCircle2, Loader2,
-  AlertCircle, ChevronRight, Trash2, Recycle, Package,
-  Leaf, Zap, X,
+  AlertCircle, ChevronRight, X,
 } from "lucide-react";
-import { api, type BackendComplaint } from "@/lib/api-client";
-
-const WASTE_TYPES = [
-  { label: "General Waste", icon: Trash2, color: "bg-gray-100 text-gray-700 border-gray-300" },
-  { label: "Recyclables", icon: Recycle, color: "bg-blue-50 text-blue-700 border-blue-300" },
-  { label: "Bulky Items", icon: Package, color: "bg-orange-50 text-orange-700 border-orange-300" },
-  { label: "Organic Waste", icon: Leaf, color: "bg-green-50 text-green-700 border-green-300" },
-  { label: "Hazardous Waste", icon: Zap, color: "bg-red-50 text-red-700 border-red-300" },
-];
+import { api, type BackendPickupRequest } from "@/lib/api-client";
 
 const TIME_SLOTS = ["06:00 – 09:00", "09:00 – 12:00", "12:00 – 15:00", "15:00 – 18:00"];
 
 const statusColor: Record<string, string> = {
-  Pending: "bg-yellow-100 text-yellow-700",
-  "In Progress": "bg-blue-100 text-blue-700",
-  Resolved: "bg-green-100 text-green-700",
+  Pending:      "bg-yellow-100 text-yellow-700",
+  "In Progress":"bg-blue-100 text-blue-700",
+  Resolved:     "bg-green-100 text-green-700",
+  Cancelled:    "bg-gray-100 text-gray-500",
 };
 
 function fmt(d?: string) {
@@ -30,7 +22,6 @@ function fmt(d?: string) {
 }
 
 export default function RequestPickupPage() {
-  const [wasteType, setWasteType] = useState("");
   const [date, setDate] = useState("");
   const [timeSlot, setTimeSlot] = useState("");
   const [notes, setNotes] = useState("");
@@ -40,41 +31,33 @@ export default function RequestPickupPage() {
   const [submitError, setSubmitError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const [requests, setRequests] = useState<BackendComplaint[]>([]);
+  const [requests, setRequests] = useState<BackendPickupRequest[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  // Load previous pickup requests
   useEffect(() => {
-    api.complaints.me()
-      .then(data => setRequests(data.filter(c => c.issue_type === "Pickup Request")))
-      .catch(() => {/* silent */})
+    api.pickupRequests.me()
+      .then(res => setRequests(res.requests))
+      .catch(() => {})
       .finally(() => setLoadingHistory(false));
   }, []);
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    if (!wasteType) { setSubmitError("Please select a waste type."); return; }
     if (!date) { setSubmitError("Please select a preferred date."); return; }
     setSubmitError("");
     setSubmitting(true);
 
-    const description = [
-      `Waste type: ${wasteType}`,
-      `Preferred date: ${date}`,
-      timeSlot ? `Preferred time: ${timeSlot}` : null,
-      notes.trim() ? `Notes: ${notes.trim()}` : null,
-    ].filter(Boolean).join("\n");
-
     try {
-      const res = await api.complaints.submit({
-        issue_type: "Pickup Request",
-        description,
+      const res = await api.pickupRequests.submit({
+        preferred_date: date,
+        preferred_time: timeSlot || undefined,
+        notes: notes.trim() || undefined,
         priority,
       });
-      setRequests(prev => [res.complaint, ...prev]);
+      setRequests(prev => [res.request, ...prev]);
       setSuccess(true);
-      setWasteType(""); setDate(""); setTimeSlot(""); setNotes(""); setPriority("Medium");
+      setDate(""); setTimeSlot(""); setNotes(""); setPriority("Medium");
       setTimeout(() => setSuccess(false), 5000);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Failed to submit request. Please try again.");
@@ -83,13 +66,13 @@ export default function RequestPickupPage() {
     }
   };
 
-  const handleCancel = async (c: BackendComplaint) => {
-    setDeletingId(c.id);
-    setRequests(prev => prev.filter(r => r.id !== c.id));
+  const handleCancel = async (r: BackendPickupRequest) => {
+    setDeletingId(r.id);
+    setRequests(prev => prev.filter(x => x.id !== r.id));
     try {
-      await api.complaints.remove(c.id);
+      await api.pickupRequests.remove(r.id);
     } catch {
-      setRequests(prev => [c, ...prev].sort((a, b) =>
+      setRequests(prev => [r, ...prev].sort((a, b) =>
         new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()
       ));
     } finally {
@@ -97,7 +80,6 @@ export default function RequestPickupPage() {
     }
   };
 
-  // Min date = today
   const today = new Date().toISOString().split("T")[0];
 
   return (
@@ -138,30 +120,6 @@ export default function RequestPickupPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-
-          {/* Waste type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Waste Type <span className="text-red-500">*</span>
-            </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {WASTE_TYPES.map(({ label, icon: Icon, color }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => setWasteType(label)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
-                    wasteType === label
-                      ? "border-green-600 bg-green-50 text-green-800 shadow-sm"
-                      : `border ${color} hover:shadow-sm`
-                  }`}
-                >
-                  <Icon size={16} />
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Date + Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -236,11 +194,10 @@ export default function RequestPickupPage() {
             disabled={submitting}
             className="w-full flex items-center justify-center gap-2 bg-green-700 hover:bg-green-800 text-white py-3 rounded-xl font-semibold text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {submitting ? (
-              <><Loader2 size={16} className="animate-spin" /> Submitting…</>
-            ) : (
-              <><Truck size={16} /> Submit Pickup Request</>
-            )}
+            {submitting
+              ? <><Loader2 size={16} className="animate-spin" /> Submitting…</>
+              : <><Truck size={16} /> Submit Pickup Request</>
+            }
           </button>
         </form>
       </div>
@@ -265,75 +222,70 @@ export default function RequestPickupPage() {
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {requests.map(r => {
-              // Parse description fields back out for display
-              const lines = r.description.split("\n");
-              const wasteTypeLine = lines.find(l => l.startsWith("Waste type:"))?.replace("Waste type: ", "") ?? "";
-              const dateLine = lines.find(l => l.startsWith("Preferred date:"))?.replace("Preferred date: ", "") ?? "";
-              const timeLine = lines.find(l => l.startsWith("Preferred time:"))?.replace("Preferred time: ", "") ?? "";
-              const notesLine = lines.find(l => l.startsWith("Notes:"))?.replace("Notes: ", "") ?? "";
-
-              return (
-                <div key={r.id} className="p-5 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between gap-3 mb-2">
-                    <div className="flex items-center gap-2">
-                      <Truck size={16} className="text-green-600 flex-shrink-0" />
-                      <p className="font-semibold text-gray-800 text-sm">{wasteTypeLine || "Pickup Request"}</p>
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${statusColor[r.status] ?? "bg-gray-100 text-gray-600"}`}>
-                      {r.status}
-                    </span>
+            {requests.map(r => (
+              <div key={r.id} className="p-5 hover:bg-gray-50 transition-colors">
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Truck size={16} className="text-green-600 flex-shrink-0" />
+                    <p className="font-semibold text-gray-800 text-sm">Pickup Request #{r.id}</p>
                   </div>
-
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mb-2">
-                    {dateLine && (
-                      <span className="flex items-center gap-1">
-                        <CalendarDays size={12} /> {dateLine}
-                      </span>
-                    )}
-                    {timeLine && (
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} /> {timeLine}
-                      </span>
-                    )}
-                    <span className={`px-2 py-0.5 rounded-full font-medium ${
-                      r.priority === "Urgent" ? "bg-red-100 text-red-700"
-                      : r.priority === "High" ? "bg-orange-100 text-orange-700"
-                      : r.priority === "Medium" ? "bg-yellow-100 text-yellow-700"
-                      : "bg-green-100 text-green-700"
-                    }`}>
-                      {r.priority}
-                    </span>
-                  </div>
-
-                  {notesLine && (
-                    <p className="text-xs text-gray-500 mb-2 italic">"{notesLine}"</p>
-                  )}
-
-                  {r.resolution_note && (
-                    <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-xs text-green-800 mb-2">
-                      <span className="font-semibold">Company response: </span>{r.resolution_note}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-400">Submitted: {fmt(r.created_at)}</p>
-                    {r.status === "Pending" && (
-                      <button
-                        onClick={() => void handleCancel(r)}
-                        disabled={deletingId === r.id}
-                        className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        {deletingId === r.id
-                          ? <Loader2 size={12} className="animate-spin" />
-                          : <X size={12} />}
-                        Cancel
-                      </button>
-                    )}
-                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-semibold flex-shrink-0 ${statusColor[r.status] ?? "bg-gray-100 text-gray-600"}`}>
+                    {r.status}
+                  </span>
                 </div>
-              );
-            })}
+
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mb-2">
+                  {r.preferred_date && (
+                    <span className="flex items-center gap-1">
+                      <CalendarDays size={12} /> {fmt(r.preferred_date)}
+                    </span>
+                  )}
+                  {r.preferred_time && (
+                    <span className="flex items-center gap-1">
+                      <Clock size={12} /> {r.preferred_time}
+                    </span>
+                  )}
+                  <span className={`px-2 py-0.5 rounded-full font-medium ${
+                    r.priority === "Urgent" ? "bg-red-100 text-red-700"
+                    : r.priority === "High" ? "bg-orange-100 text-orange-700"
+                    : r.priority === "Medium" ? "bg-yellow-100 text-yellow-700"
+                    : "bg-green-100 text-green-700"
+                  }`}>
+                    {r.priority}
+                  </span>
+                </div>
+
+                {r.notes && (
+                  <p className="text-xs text-gray-500 mb-2 italic">"{r.notes}"</p>
+                )}
+
+                {r.assigned_driver && (
+                  <p className="text-xs text-blue-700 mb-1">Driver: {r.assigned_driver}</p>
+                )}
+
+                {r.resolution_note && (
+                  <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2 text-xs text-green-800 mb-2">
+                    <span className="font-semibold">Company response: </span>{r.resolution_note}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-gray-400">Submitted: {fmt(r.created_at)}</p>
+                  {r.status === "Pending" && (
+                    <button
+                      onClick={() => void handleCancel(r)}
+                      disabled={deletingId === r.id}
+                      className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {deletingId === r.id
+                        ? <Loader2 size={12} className="animate-spin" />
+                        : <X size={12} />}
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

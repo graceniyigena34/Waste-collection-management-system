@@ -10,7 +10,7 @@ import {
   CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send, PackagePlus,
 } from "lucide-react";
 import { isWasteCollectorRole } from "@/lib/company-application";
-import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, getStoredUserInfo } from "@/lib/api-client";
+import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendPickupRequest, type BackendAssignment, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, getStoredUserInfo } from "@/lib/api-client";
 import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
@@ -52,10 +52,20 @@ export default function WasteCompanyDashboard() {
   const userInfo = getStoredUserInfo();
   const [application, setApplication] = useState<BackendCompanyProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [assignmentDriver, setAssignmentDriver] = useState("");
-  const [assignmentVehicle, setAssignmentVehicle] = useState("");
+  const [assignmentDriverId, setAssignmentDriverId] = useState("");
+  const [assignmentVehicleId, setAssignmentVehicleId] = useState("");
   const [assignmentZone, setAssignmentZone] = useState("");
-  const [assignments, setAssignments] = useState<Array<{ driver: string; vehicle: string; zone: string; createdAt: string }>>([]);
+  const [assignmentNotes, setAssignmentNotes] = useState("");
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [assignmentError, setAssignmentError] = useState("");
+  const [assignments, setAssignments] = useState<BackendAssignment[]>([]);
+  const [editAssignmentTarget, setEditAssignmentTarget] = useState<BackendAssignment | null>(null);
+  const [editAssignmentDriverId, setEditAssignmentDriverId] = useState("");
+  const [editAssignmentVehicleId, setEditAssignmentVehicleId] = useState("");
+  const [editAssignmentZone, setEditAssignmentZone] = useState("");
+  const [editAssignmentNotes, setEditAssignmentNotes] = useState("");
+  const [editAssignmentSaving, setEditAssignmentSaving] = useState(false);
+  const [editAssignmentError, setEditAssignmentError] = useState("");
   const [districtDraft, setDistrictDraft] = useState("");
   const [districtSaving, setDistrictSaving] = useState(false);
   const [districtMessage, setDistrictMessage] = useState("");
@@ -88,6 +98,16 @@ export default function WasteCompanyDashboard() {
   const [respondStatus, setRespondStatus] = useState<"In Progress" | "Resolved">("In Progress");
   const [respondSaving, setRespondSaving] = useState(false);
   const [respondError, setRespondError] = useState("");
+
+  const [pickupRequests, setPickupRequests] = useState<BackendPickupRequest[]>([]);
+  const [pickupRequestsLoading, setPickupRequestsLoading] = useState(false);
+  const [pickupRequestsError, setPickupRequestsError] = useState("");
+  const [pickupRespondTarget, setPickupRespondTarget] = useState<BackendPickupRequest | null>(null);
+  const [pickupRespondNote, setPickupRespondNote] = useState("");
+  const [pickupRespondStatus, setPickupRespondStatus] = useState<"In Progress" | "Resolved">("In Progress");
+  const [pickupRespondDriver, setPickupRespondDriver] = useState("");
+  const [pickupRespondSaving, setPickupRespondSaving] = useState(false);
+  const [pickupRespondError, setPickupRespondError] = useState("");
 
   const [citizens, setCitizens] = useState<BackendHousehold[]>([]);
   const [citizensLoading, setCitizensLoading] = useState(false);
@@ -160,6 +180,9 @@ export default function WasteCompanyDashboard() {
     if (!application?.id) return;
     api.drivers.list(application.id)
       .then(res => setCompanyDrivers(res.drivers))
+      .catch(() => {});
+    api.assignments.list(application.id)
+      .then(res => setAssignments(res.assignments))
       .catch(() => {});
   }, [application?.id]);
 
@@ -236,6 +259,23 @@ export default function WasteCompanyDashboard() {
 
   useEffect(() => {
     if (!application?.district) return;
+    const loadPickups = async () => {
+      setPickupRequestsLoading(true);
+      setPickupRequestsError("");
+      try {
+        const res = await api.pickupRequests.all();
+        setPickupRequests(res.requests);
+      } catch (err) {
+        setPickupRequestsError(err instanceof Error ? err.message : "Failed to load pickup requests.");
+      } finally {
+        setPickupRequestsLoading(false);
+      }
+    };
+    void loadPickups();
+  }, [application?.district]);
+
+  useEffect(() => {
+    if (!application?.district) return;
     const loadCitizens = async () => {
       setCitizensLoading(true);
       setCitizensError("");
@@ -271,6 +311,32 @@ export default function WasteCompanyDashboard() {
       setRespondError(err instanceof Error ? err.message : "Failed to send response.");
     } finally {
       setRespondSaving(false);
+    }
+  };
+
+  const handlePickupRespond = async () => {
+    if (!pickupRespondTarget || !pickupRespondNote.trim()) {
+      setPickupRespondError("Please enter a response note.");
+      return;
+    }
+    setPickupRespondSaving(true);
+    setPickupRespondError("");
+    try {
+      const res = await api.pickupRequests.updateStatus(
+        pickupRespondTarget.id,
+        pickupRespondStatus,
+        pickupRespondDriver.trim() || undefined,
+        pickupRespondNote.trim(),
+      );
+      setPickupRequests(prev => prev.map(r => r.id === pickupRespondTarget.id ? res.request : r));
+      setPickupRespondTarget(null);
+      setPickupRespondNote("");
+      setPickupRespondDriver("");
+      setPickupRespondStatus("In Progress");
+    } catch (err) {
+      setPickupRespondError(err instanceof Error ? err.message : "Failed to send response.");
+    } finally {
+      setPickupRespondSaving(false);
     }
   };
 
@@ -809,24 +875,56 @@ export default function WasteCompanyDashboard() {
     completed: scheduleTasks.filter((task) => task.status === "Completed").length,
   };
 
-  const handleCreateAssignment = () => {
-    if (!assignmentDriver || !assignmentVehicle || !assignmentZone) {
+  const handleCreateAssignment = async () => {
+    if (!application?.id || !assignmentDriverId || !assignmentVehicleId || !assignmentZone) {
+      setAssignmentError("Please select a driver, vehicle and zone.");
       return;
     }
-
-    setAssignments((current) => [
-      {
-        driver: assignmentDriver,
-        vehicle: assignmentVehicle,
+    setAssignmentSaving(true);
+    setAssignmentError("");
+    try {
+      const res = await api.assignments.create({
+        company_id: application.id,
+        driver_id: Number(assignmentDriverId),
+        vehicle_id: Number(assignmentVehicleId),
         zone: assignmentZone,
-        createdAt: new Date().toLocaleString(),
-      },
-      ...current,
-    ]);
+        notes: assignmentNotes.trim() || undefined,
+      });
+      setAssignments(prev => [res.assignment, ...prev]);
+      setAssignmentDriverId("");
+      setAssignmentVehicleId("");
+      setAssignmentZone("");
+      setAssignmentNotes("");
+    } catch (err) {
+      setAssignmentError(err instanceof Error ? err.message : "Failed to save assignment.");
+    } finally {
+      setAssignmentSaving(false);
+    }
+  };
 
-    setAssignmentDriver("");
-    setAssignmentVehicle("");
-    setAssignmentZone("");
+  const handleEditAssignment = async () => {
+    if (!editAssignmentTarget || !application?.id) return;
+    if (!editAssignmentDriverId || !editAssignmentVehicleId || !editAssignmentZone) {
+      setEditAssignmentError("Please select a driver, vehicle and zone.");
+      return;
+    }
+    setEditAssignmentSaving(true);
+    setEditAssignmentError("");
+    try {
+      const res = await api.assignments.update(editAssignmentTarget.id, {
+        company_id: application.id,
+        driver_id: Number(editAssignmentDriverId),
+        vehicle_id: Number(editAssignmentVehicleId),
+        zone: editAssignmentZone,
+        notes: editAssignmentNotes.trim() || undefined,
+      });
+      setAssignments(prev => prev.map(a => a.id === editAssignmentTarget.id ? res.assignment : a));
+      setEditAssignmentTarget(null);
+    } catch (err) {
+      setEditAssignmentError(err instanceof Error ? err.message : "Failed to update assignment.");
+    } finally {
+      setEditAssignmentSaving(false);
+    }
   };
 
   return (
@@ -1282,35 +1380,54 @@ export default function WasteCompanyDashboard() {
                 <p className="text-sm text-gray-600">
                   Assign a driver to a vehicle and zone. This is the place to manage dispatch planning for daily work.
                 </p>
+                {assignmentError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 rounded-xl">{assignmentError}</div>
+                )}
                 <div className="grid gap-3 md:grid-cols-2">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Driver</label>
-                    <select value={assignmentDriver} onChange={(e) => setAssignmentDriver(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <select value={assignmentDriverId} onChange={(e) => setAssignmentDriverId(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
                       <option value="">Select driver</option>
                       {companyDrivers.map((driver) => (
-                        <option key={driver.id} value={driver.name}>{driver.name}</option>
+                        <option key={driver.id} value={driver.id}>{driver.name}</option>
                       ))}
                     </select>
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Vehicle</label>
-                    <select value={assignmentVehicle} onChange={(e) => setAssignmentVehicle(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <select value={assignmentVehicleId} onChange={(e) => setAssignmentVehicleId(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
                       <option value="">Select vehicle</option>
                       {companyVehicles.map((v) => (
-                        <option key={v.id} value={v.plate_number}>{v.plate_number} — {v.model}</option>
+                        <option key={v.id} value={v.id}>{v.plate_number} — {v.model}</option>
                       ))}
                     </select>
                   </div>
                   <div className="md:col-span-2">
                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Zone</label>
-                    <select value={assignmentZone} onChange={(e) => setAssignmentZone(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <select value={assignmentZone} onChange={(e) => setAssignmentZone(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500">
                       <option value="">Select zone</option>
                       {assignmentZones.map((zone) => <option key={zone}>{zone}</option>)}
                     </select>
                   </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium text-gray-700">Notes (optional)</label>
+                    <input
+                      type="text"
+                      value={assignmentNotes}
+                      onChange={e => setAssignmentNotes(e.target.value)}
+                      placeholder="e.g. Morning shift, heavy loads..."
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
                 </div>
-                <button onClick={handleCreateAssignment} className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition">
-                  <Plus size={15} /> Save assignment
+                <button
+                  onClick={() => void handleCreateAssignment()}
+                  disabled={assignmentSaving}
+                  className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal-700 transition disabled:opacity-60"
+                >
+                  {assignmentSaving
+                    ? <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> Saving…</>
+                    : <><Plus size={15} /> Save assignment</>}
                 </button>
               </div>
             </Card>
@@ -1320,12 +1437,45 @@ export default function WasteCompanyDashboard() {
                 <p className="text-sm text-gray-400">No assignments saved yet.</p>
               ) : (
                 <div className="space-y-3">
-                  {assignments.map((assignment, index) => (
-                    <div key={`${assignment.driver}-${index}`} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
-                      <p className="font-semibold text-gray-900">{assignment.driver}</p>
-                      <p className="text-xs text-gray-500">Vehicle: {assignment.vehicle}</p>
-                      <p className="text-xs text-gray-500">Zone: {assignment.zone}</p>
-                      <p className="text-[11px] text-gray-400">Saved {assignment.createdAt}</p>
+                  {assignments.map((a) => (
+                    <div key={a.id} className="rounded-2xl bg-gray-50 border border-gray-100 p-4 space-y-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900">{a.driver_name ?? `Driver #${a.driver_id}`}</p>
+                          <p className="text-xs text-gray-500">Vehicle: {a.vehicle_plate ?? `#${a.vehicle_id}`}{a.vehicle_model ? ` — ${a.vehicle_model}` : ""}</p>
+                          <p className="text-xs text-gray-500">Zone: {a.zone}</p>
+                          {a.notes && <p className="text-xs text-gray-400 italic">"{a.notes}"</p>}
+                          <p className="text-[11px] text-gray-400">
+                            Saved {a.created_at ? new Date(a.created_at).toLocaleString() : "—"}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditAssignmentTarget(a);
+                              setEditAssignmentDriverId(String(a.driver_id));
+                              setEditAssignmentVehicleId(String(a.vehicle_id));
+                              setEditAssignmentZone(a.zone);
+                              setEditAssignmentNotes(a.notes ?? "");
+                              setEditAssignmentError("");
+                            }}
+                            className="px-2.5 py-1 text-teal-700 border border-teal-200 rounded-lg text-xs font-medium hover:bg-teal-50 transition flex items-center gap-1"
+                          >
+                            <Edit3 size={11} /> Edit
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (!application?.id) return;
+                              setAssignments(prev => prev.filter(x => x.id !== a.id));
+                              try { await api.assignments.remove(a.id, application.id); }
+                              catch { setAssignments(prev => [a, ...prev]); }
+                            }}
+                            className="px-2.5 py-1 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-50 transition flex items-center gap-1"
+                          >
+                            <Trash2 size={11} /> Delete
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1438,151 +1588,126 @@ export default function WasteCompanyDashboard() {
               icon={<PackagePlus size={16} className="text-amber-600" />}
             >
               {/* Stats row */}
-              {(() => {
-                const pickups = complaints.filter(c => c.issue_type === "Pickup Request");
-                const pending = pickups.filter(c => c.status === "Pending");
-                const inProgress = pickups.filter(c => c.status === "In Progress");
-                const resolved = pickups.filter(c => c.status === "Resolved");
-                return (
-                  <>
-                    <div className="grid grid-cols-4 gap-3 mb-4">
-                      {[
-                        { label: "Total", value: pickups.length, color: "text-amber-600 bg-amber-50" },
-                        { label: "New", value: pending.length, color: "text-orange-600 bg-orange-50" },
-                        { label: "In Progress", value: inProgress.length, color: "text-blue-600 bg-blue-50" },
-                        { label: "Completed", value: resolved.length, color: "text-green-600 bg-green-50" },
-                      ].map(s => (
-                        <div key={s.label} className={`${s.color} rounded-xl p-3 text-center`}>
-                          <p className="text-xl font-bold">{s.value}</p>
-                          <p className="text-xs">{s.label}</p>
-                        </div>
-                      ))}
+              <>
+                <div className="grid grid-cols-4 gap-3 mb-4">
+                  {[
+                    { label: "Total", value: pickupRequests.length, color: "text-amber-600 bg-amber-50" },
+                    { label: "New", value: pickupRequests.filter(r => r.status === "Pending").length, color: "text-orange-600 bg-orange-50" },
+                    { label: "In Progress", value: pickupRequests.filter(r => r.status === "In Progress").length, color: "text-blue-600 bg-blue-50" },
+                    { label: "Completed", value: pickupRequests.filter(r => r.status === "Resolved").length, color: "text-green-600 bg-green-50" },
+                  ].map(s => (
+                    <div key={s.label} className={`${s.color} rounded-xl p-3 text-center`}>
+                      <p className="text-xl font-bold">{s.value}</p>
+                      <p className="text-xs">{s.label}</p>
                     </div>
+                  ))}
+                </div>
 
-                    {complaintsLoading ? (
-                      <div className="flex justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-amber-500" />
-                      </div>
-                    ) : complaintsError ? (
-                      <p className="text-sm text-red-500">{complaintsError}</p>
-                    ) : !application.district ? (
-                      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                        Set your working district to see pickup requests from citizens in your area.
-                      </div>
-                    ) : pickups.length === 0 ? (
-                      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
-                        <PackagePlus size={32} className="mx-auto mb-2 opacity-30" />
-                        No pickup requests yet from citizens in {companyDistrict?.name || application.district}.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {pickups.sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()).map(c => {
-                          // Parse structured description from the citizen's form
-                          const lines = c.description.split("\n");
-                          const wasteType = lines.find(l => l.startsWith("Waste type:"))?.replace("Waste type: ", "") ?? "";
-                          const prefDate = lines.find(l => l.startsWith("Preferred date:"))?.replace("Preferred date: ", "") ?? "";
-                          const prefTime = lines.find(l => l.startsWith("Preferred time:"))?.replace("Preferred time: ", "") ?? "";
-                          const notes = lines.find(l => l.startsWith("Notes:"))?.replace("Notes: ", "") ?? "";
-
-                          return (
-                            <div key={c.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                  {/* Header row */}
-                                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                                    <span className="font-mono text-xs text-gray-400">#{c.id}</span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                      c.priority === "Urgent" ? "bg-red-100 text-red-700" :
-                                      c.priority === "High" ? "bg-orange-100 text-orange-700" :
-                                      c.priority === "Medium" ? "bg-yellow-100 text-yellow-700" :
-                                      "bg-green-100 text-green-700"
-                                    }`}>{c.priority}</span>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                      c.status === "Resolved" ? "bg-green-100 text-green-700" :
-                                      c.status === "In Progress" ? "bg-blue-100 text-blue-700" :
-                                      "bg-yellow-100 text-yellow-700"
-                                    }`}>{c.status}</span>
-                                    {wasteType && (
-                                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                        {wasteType}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {/* Citizen info */}
-                                  <p className="font-semibold text-gray-900 text-sm">{c.full_name ?? "Unknown citizen"}</p>
-                                  <p className="text-xs text-gray-500">{c.zone ?? "—"}</p>
-
-                                  {/* Pickup details */}
-                                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
-                                    {prefDate && (
-                                      <span className="flex items-center gap-1">
-                                        <CalendarDays size={11} className="text-amber-500" /> {prefDate}
-                                      </span>
-                                    )}
-                                    {prefTime && (
-                                      <span className="flex items-center gap-1">
-                                        <Clock size={11} className="text-amber-500" /> {prefTime}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                  {notes && (
-                                    <p className="text-xs text-gray-500 mt-1.5 italic">"{notes}"</p>
-                                  )}
-
-                                  {c.assigned_to && (
-                                    <p className="text-xs text-green-700 mt-1">Assigned driver: {c.assigned_to}</p>
-                                  )}
-                                  {c.resolution_note && (
-                                    <p className="text-xs text-blue-700 mt-1 bg-blue-50 rounded px-2 py-1">Response: {c.resolution_note}</p>
-                                  )}
-
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    Submitted: {c.created_at ? new Date(c.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
-                                  </p>
-                                </div>
-
-                                <div className="flex flex-col gap-2 flex-shrink-0">
-                                  <button
-                                    onClick={() => setViewedComplaint(c)}
-                                    className="px-3 py-1.5 text-blue-600 border border-blue-200 rounded-lg text-xs font-medium hover:bg-blue-50 transition flex items-center gap-1"
-                                  >
-                                    <Eye size={12} /> View
-                                  </button>
-                                  {c.status !== "Resolved" && (
-                                    <button
-                                      onClick={() => {
-                                        setRespondTarget(c);
-                                        setRespondNote(c.resolution_note ?? "");
-                                        setRespondStatus("In Progress");
-                                        setRespondError("");
-                                      }}
-                                      className="px-3 py-1.5 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium hover:bg-amber-50 transition flex items-center gap-1"
-                                    >
-                                      <CheckCircle2 size={12} /> Confirm
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={async () => {
-                                      setComplaints(prev => prev.filter(x => x.id !== c.id));
-                                      try { await api.complaints.remove(c.id); }
-                                      catch { setComplaints(prev => [c, ...prev].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())); }
-                                    }}
-                                    className="px-3 py-1.5 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-50 transition flex items-center gap-1"
-                                  >
-                                    <Trash2 size={12} /> Dismiss
-                                  </button>
-                                </div>
-                              </div>
+                {pickupRequestsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-amber-500" />
+                  </div>
+                ) : pickupRequestsError ? (
+                  <p className="text-sm text-red-500">{pickupRequestsError}</p>
+                ) : !application.district ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Set your working district to see pickup requests from citizens in your area.
+                  </div>
+                ) : pickupRequests.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+                    <PackagePlus size={32} className="mx-auto mb-2 opacity-30" />
+                    No pickup requests yet from citizens in {companyDistrict?.name || application.district}.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {[...pickupRequests].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime()).map(r => (
+                      <div key={r.id} className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            {/* Header row */}
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className="font-mono text-xs text-gray-400">#{r.id}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                r.priority === "Urgent" ? "bg-red-100 text-red-700" :
+                                r.priority === "High" ? "bg-orange-100 text-orange-700" :
+                                r.priority === "Medium" ? "bg-yellow-100 text-yellow-700" :
+                                "bg-green-100 text-green-700"
+                              }`}>{r.priority}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                r.status === "Resolved" ? "bg-green-100 text-green-700" :
+                                r.status === "In Progress" ? "bg-blue-100 text-blue-700" :
+                                r.status === "Cancelled" ? "bg-gray-100 text-gray-500" :
+                                "bg-yellow-100 text-yellow-700"
+                              }`}>{r.status}</span>
                             </div>
-                          );
-                        })}
+
+                            {/* Citizen info */}
+                            <p className="font-semibold text-gray-900 text-sm">{r.full_name ?? "Unknown citizen"}</p>
+                            <p className="text-xs text-gray-500">{[r.zone, r.sector, r.district].filter(Boolean).join(", ") || "—"}</p>
+
+                            {/* Pickup details */}
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                              {r.preferred_date && (
+                                <span className="flex items-center gap-1">
+                                  <CalendarDays size={11} className="text-amber-500" />
+                                  {new Date(r.preferred_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                </span>
+                              )}
+                              {r.preferred_time && (
+                                <span className="flex items-center gap-1">
+                                  <Clock size={11} className="text-amber-500" /> {r.preferred_time}
+                                </span>
+                              )}
+                            </div>
+
+                            {r.notes && (
+                              <p className="text-xs text-gray-500 mt-1.5 italic">"{r.notes}"</p>
+                            )}
+
+                            {r.assigned_driver && (
+                              <p className="text-xs text-green-700 mt-1">Assigned driver: {r.assigned_driver}</p>
+                            )}
+                            {r.resolution_note && (
+                              <p className="text-xs text-blue-700 mt-1 bg-blue-50 rounded px-2 py-1">Response: {r.resolution_note}</p>
+                            )}
+
+                            <p className="text-xs text-gray-400 mt-1">
+                              Submitted: {r.created_at ? new Date(r.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col gap-2 flex-shrink-0">
+                            {r.status !== "Resolved" && r.status !== "Cancelled" && (
+                              <button
+                                onClick={() => {
+                                  setPickupRespondTarget(r);
+                                  setPickupRespondNote(r.resolution_note ?? "");
+                                  setPickupRespondDriver(r.assigned_driver ?? "");
+                                  setPickupRespondStatus("In Progress");
+                                  setPickupRespondError("");
+                                }}
+                                className="px-3 py-1.5 text-amber-700 border border-amber-200 rounded-lg text-xs font-medium hover:bg-amber-50 transition flex items-center gap-1"
+                              >
+                                <CheckCircle2 size={12} /> Respond
+                              </button>
+                            )}
+                            <button
+                              onClick={async () => {
+                                setPickupRequests(prev => prev.filter(x => x.id !== r.id));
+                                try { await api.pickupRequests.remove(r.id); }
+                                catch { setPickupRequests(prev => [r, ...prev].sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())); }
+                              }}
+                              className="px-3 py-1.5 text-red-600 border border-red-200 rounded-lg text-xs font-medium hover:bg-red-50 transition flex items-center gap-1"
+                            >
+                              <Trash2 size={12} /> Dismiss
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                  </>
-                );
-              })()}
+                    ))}
+                  </div>
+                )}
+              </>
             </Card>
           </div>
 
@@ -2073,6 +2198,177 @@ export default function WasteCompanyDashboard() {
                       className="flex-1 py-2 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition disabled:opacity-60 flex items-center justify-center gap-2"
                     >
                       {respondSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> Sending…</> : "Send Response"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Edit assignment modal */}
+          {editAssignmentTarget && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b">
+                  <h3 className="font-bold text-gray-800">Edit Assignment</h3>
+                  <button onClick={() => setEditAssignmentTarget(null)} disabled={editAssignmentSaving}>
+                    <X size={20} className="text-gray-400" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  {editAssignmentError && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 rounded-xl">{editAssignmentError}</div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Driver</label>
+                    <select
+                      value={editAssignmentDriverId}
+                      onChange={e => setEditAssignmentDriverId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="">Select driver</option>
+                      {companyDrivers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Vehicle</label>
+                    <select
+                      value={editAssignmentVehicleId}
+                      onChange={e => setEditAssignmentVehicleId(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="">Select vehicle</option>
+                      {companyVehicles.map(v => <option key={v.id} value={v.id}>{v.plate_number} — {v.model}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Zone</label>
+                    <select
+                      value={editAssignmentZone}
+                      onChange={e => setEditAssignmentZone(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                      <option value="">Select zone</option>
+                      {assignmentZones.map(zone => <option key={zone}>{zone}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Notes (optional)</label>
+                    <input
+                      type="text"
+                      value={editAssignmentNotes}
+                      onChange={e => setEditAssignmentNotes(e.target.value)}
+                      placeholder="e.g. Morning shift..."
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setEditAssignmentTarget(null)}
+                      disabled={editAssignmentSaving}
+                      className="flex-1 py-2 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => void handleEditAssignment()}
+                      disabled={editAssignmentSaving}
+                      className="flex-1 py-2 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 transition disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {editAssignmentSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> Saving…</> : "Save Changes"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Respond to pickup request modal */}
+          {pickupRespondTarget && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b">
+                  <h3 className="font-bold text-gray-800">Respond to Pickup Request</h3>
+                  <button onClick={() => setPickupRespondTarget(null)} disabled={pickupRespondSaving}>
+                    <X size={20} className="text-gray-400" />
+                  </button>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="bg-amber-50 rounded-xl p-3">
+                    <p className="font-medium text-gray-800 text-sm">
+                      Pickup Request #{pickupRespondTarget.id}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {pickupRespondTarget.full_name ?? "—"} • {pickupRespondTarget.zone ?? pickupRespondTarget.district ?? "—"}
+                    </p>
+                    {pickupRespondTarget.preferred_date && (
+                      <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                        <CalendarDays size={11} className="text-amber-500" />
+                        {new Date(pickupRespondTarget.preferred_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {pickupRespondTarget.preferred_time && ` · ${pickupRespondTarget.preferred_time}`}
+                      </p>
+                    )}
+                    {pickupRespondTarget.notes && (
+                      <p className="text-xs text-gray-500 mt-1 italic">"{pickupRespondTarget.notes}"</p>
+                    )}
+                  </div>
+
+                  {pickupRespondError && (
+                    <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 rounded-xl">
+                      {pickupRespondError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Update Status</label>
+                    <select
+                      value={pickupRespondStatus}
+                      onChange={e => setPickupRespondStatus(e.target.value as "In Progress" | "Resolved")}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="In Progress">In Progress</option>
+                      <option value="Resolved">Resolved</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Assigned Driver (optional)</label>
+                    <input
+                      type="text"
+                      value={pickupRespondDriver}
+                      onChange={e => setPickupRespondDriver(e.target.value)}
+                      placeholder="Driver name..."
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Response Note <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={pickupRespondNote}
+                      onChange={e => setPickupRespondNote(e.target.value)}
+                      rows={3}
+                      placeholder="Confirm pickup time, provide instructions, or explain next steps..."
+                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setPickupRespondTarget(null)}
+                      disabled={pickupRespondSaving}
+                      className="flex-1 py-2 border border-gray-200 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 transition"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handlePickupRespond}
+                      disabled={pickupRespondSaving}
+                      className="flex-1 py-2 bg-amber-600 text-white rounded-xl text-sm font-medium hover:bg-amber-700 transition disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {pickupRespondSaving ? <><div className="animate-spin rounded-full h-4 w-4 border-t-2 border-white" /> Sending…</> : "Send Response"}
                     </button>
                   </div>
                 </div>

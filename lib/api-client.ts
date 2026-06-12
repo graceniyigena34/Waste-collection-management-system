@@ -143,6 +143,27 @@ export interface BackendComplaint {
   zone?: string;
 }
 
+export interface BackendPickupRequest {
+  id: number;
+  user_id: number;
+  preferred_date: string;
+  preferred_time?: string;
+  notes?: string;
+  priority: "Low" | "Medium" | "High" | "Urgent";
+  status: "Pending" | "In Progress" | "Resolved" | "Cancelled";
+  assigned_driver?: string;
+  resolution_note?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Company/admin view (from JOIN)
+  full_name?: string;
+  email?: string;
+  telephone?: string;
+  district?: string;
+  sector?: string;
+  zone?: string;
+}
+
 export interface BackendNotification {
   id: number;
   user_id: number;
@@ -189,6 +210,20 @@ export interface BackendDriver {
 
 export interface BackendDriverWithCompany extends BackendDriver {
   company_name?: string;
+}
+
+export interface BackendAssignment {
+  id: number;
+  company_id: number;
+  driver_id: number;
+  vehicle_id: number;
+  zone: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  driver_name?: string;
+  vehicle_plate?: string;
+  vehicle_model?: string;
 }
 
 export interface BackendCompanySchedule {
@@ -613,6 +648,53 @@ export const api = {
         method: "DELETE",
         auth: true,
       }),
+  },
+
+  pickupRequests: {
+    submit: (data: { preferred_date: string; preferred_time?: string; notes?: string; priority?: string }) =>
+      apiFetch<{ message: string; request: BackendPickupRequest }>("/api/pickup-requests", {
+        method: "POST",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    me: () =>
+      apiFetch<{ requests: BackendPickupRequest[] }>("/api/pickup-requests/me", { method: "GET", auth: true }),
+
+    all: () =>
+      apiFetch<{ requests: BackendPickupRequest[] }>("/api/pickup-requests", { method: "GET", auth: true }),
+
+    updateStatus: (id: number, status: string, assigned_driver?: string, resolution_note?: string) =>
+      apiFetch<{ message: string; request: BackendPickupRequest }>(`/api/pickup-requests/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, assigned_driver, resolution_note }),
+        auth: true,
+      }),
+
+    remove: (id: number) =>
+      apiFetch<{ message: string }>(`/api/pickup-requests/${id}`, { method: "DELETE", auth: true }),
+  },
+
+  assignments: {
+    list: (companyId: number) =>
+      apiFetch<{ assignments: BackendAssignment[] }>(`/api/assignments/company/${companyId}`, { method: "GET", auth: true }),
+
+    create: (data: { company_id: number; driver_id: number; vehicle_id: number; zone: string; notes?: string }) =>
+      apiFetch<{ message: string; assignment: BackendAssignment }>("/api/assignments", {
+        method: "POST",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    update: (id: number, data: { company_id: number; driver_id?: number; vehicle_id?: number; zone?: string; notes?: string }) =>
+      apiFetch<{ message: string; assignment: BackendAssignment }>(`/api/assignments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        auth: true,
+      }),
+
+    remove: (id: number, companyId: number) =>
+      apiFetch<{ message: string }>(`/api/assignments/${id}?company_id=${companyId}`, { method: "DELETE", auth: true }),
   },
 
   vehicles: {
