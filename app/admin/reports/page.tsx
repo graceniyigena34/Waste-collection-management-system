@@ -1,43 +1,125 @@
 'use client';
 
-import React, { useState } from 'react';
-import { BarChart3, TrendingUp, Download, Users, Truck, DollarSign, AlertTriangle, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BarChart3, TrendingUp, Download, Users, Truck, DollarSign, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { api, BackendPayment, BackendComplaint, BackendHousehold, BackendDriverWithCompany } from '@/lib/api-client';
 
-const monthlyData = [
-  { month: 'Jul', collections: 120, revenue: 72000, complaints: 8 },
-  { month: 'Aug', collections: 135, revenue: 81000, complaints: 6 },
-  { month: 'Sep', collections: 128, revenue: 76800, complaints: 10 },
-  { month: 'Oct', collections: 142, revenue: 85200, complaints: 7 },
-  { month: 'Nov', collections: 138, revenue: 82800, complaints: 9 },
-  { month: 'Dec', collections: 150, revenue: 90000, complaints: 5 },
-  { month: 'Jan', collections: 156, revenue: 93600, complaints: 12 },
-];
+interface MonthlyPoint { month: string; collections: number; revenue: number; complaints: number; }
+interface ZoneRow { zone: string; households: number; revenue: number; complaints: number; }
 
-const zoneData = [
-  { zone: 'Kicukiro', households: 820, collected: 88, revenue: '24.6K RWF', complaints: 4 },
-  { zone: 'Gasabo', households: 950, collected: 72, revenue: '28.5K RWF', complaints: 5 },
-  { zone: 'Nyarugenge', households: 680, collected: 65, revenue: '20.4K RWF', complaints: 2 },
-  { zone: 'Remera', households: 397, collected: 91, revenue: '11.9K RWF', complaints: 1 },
-];
+function buildMonthlyData(payments: BackendPayment[], complaints: BackendComplaint[]): MonthlyPoint[] {
+  const map = new Map<string, MonthlyPoint>();
+  const monthLabel = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+  };
 
-const maxCollections = Math.max(...monthlyData.map(d => d.collections));
+  payments.forEach(p => {
+    const key = p.payment_date ? monthLabel(p.payment_date) : p.month?.slice(0, 7) ?? 'Unknown';
+    const cur = map.get(key) ?? { month: key, collections: 0, revenue: 0, complaints: 0 };
+    if (p.status === 'Paid') { cur.collections += 1; cur.revenue += Number(p.amount); }
+    map.set(key, cur);
+  });
+
+  complaints.forEach(c => {
+    const key = c.created_at ? monthLabel(c.created_at) : 'Unknown';
+    const cur = map.get(key) ?? { month: key, collections: 0, revenue: 0, complaints: 0 };
+    cur.complaints += 1;
+    map.set(key, cur);
+  });
+
+  return Array.from(map.values()).slice(-7);
+}
+
+function buildZoneData(households: BackendHousehold[], payments: BackendPayment[], complaints: BackendComplaint[]): ZoneRow[] {
+  const zones = new Map<string, ZoneRow>();
+
+  households.forEach(h => {
+    const z = h.district || 'Unknown';
+    const cur = zones.get(z) ?? { zone: z, households: 0, revenue: 0, complaints: 0 };
+    cur.households += 1;
+    zones.set(z, cur);
+  });
+
+  payments.filter(p => p.status === 'Paid').forEach(p => {
+    const h = households.find(h => h.id === p.household_id);
+    const z = h?.district || 'Unknown';
+    const cur = zones.get(z) ?? { zone: z, households: 0, revenue: 0, complaints: 0 };
+    cur.revenue += Number(p.amount);
+    zones.set(z, cur);
+  });
+
+  complaints.forEach(c => {
+    const h = households.find(h => h.id === c.household_id);
+    const z = h?.district || 'Unknown';
+    const cur = zones.get(z) ?? { zone: z, households: 0, revenue: 0, complaints: 0 };
+    cur.complaints += 1;
+    zones.set(z, cur);
+  });
+
+  return Array.from(zones.values()).sort((a, b) => b.households - a.households);
+}
+
+function exportCSV(zones: ZoneRow[]) {
+  const rows = [
+    ['Zone', 'Households', 'Revenue (RWF)', 'Complaints'],
+    ...zones.map(z => [z.zone, z.households, z.revenue, z.complaints]),
+  ];
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'zone-report.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'collections' | 'revenue' | 'complaints'>('collections');
+  const [loading, setLoading] = useState(true);
+  const [payments, setPayments] = useState<BackendPayment[]>([]);
+  const [complaints, setComplaints] = useState<BackendComplaint[]>([]);
+  const [households, setHouseholds] = useState<BackendHousehold[]>([]);
+  const [drivers, setDrivers] = useState<BackendDriverWithCompany[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      api.payments.all().catch(() => [] as BackendPayment[]),
+      api.complaints.all().catch(() => [] as BackendComplaint[]),
+      api.households.all().catch(() => [] as BackendHousehold[]),
+      api.drivers.all().catch(() => ({ drivers: [] as BackendDriverWithCompany[] })),
+    ]).then(([p, c, h, d]) => {
+      setPayments(p);
+      setComplaints(c);
+      setHouseholds(h);
+      setDrivers(d.drivers ?? []);
+      setLoading(false);
+    });
+  }, []);
+
+  const paidPayments = payments.filter(p => p.status === 'Paid');
+  const totalRevenue = paidPayments.reduce((s, p) => s + Number(p.amount), 0);
+  const monthlyData = buildMonthlyData(payments, complaints);
+  const zoneData = buildZoneData(households, payments, complaints);
+  const maxHouseholds = Math.max(...zoneData.map(z => z.households), 1);
 
   const kpis = [
-    { label: 'Total Collections (YTD)', value: '969', change: '+14%', icon: <Truck size={20} className="text-green-600" />, bg: 'bg-green-50', color: 'text-green-600' },
-    { label: 'Total Revenue (YTD)', value: '581K RWF', change: '+11%', icon: <DollarSign size={20} className="text-purple-600" />, bg: 'bg-purple-50', color: 'text-purple-600' },
-    { label: 'Avg Completion Rate', value: '85%', change: '+3%', icon: <CheckCircle size={20} className="text-blue-600" />, bg: 'bg-blue-50', color: 'text-blue-600' },
-    { label: 'Total Complaints', value: '57', change: '-8%', icon: <AlertTriangle size={20} className="text-orange-500" />, bg: 'bg-orange-50', color: 'text-orange-500' },
+    { label: 'Total Households', value: households.length.toString(), icon: <Truck size={20} className="text-green-600" />, bg: 'bg-green-50', color: 'text-green-600' },
+    { label: 'Total Revenue', value: `${(totalRevenue / 1000).toFixed(0)}K RWF`, icon: <DollarSign size={20} className="text-purple-600" />, bg: 'bg-purple-50', color: 'text-purple-600' },
+    { label: 'Paid Payments', value: paidPayments.length.toString(), icon: <CheckCircle size={20} className="text-blue-600" />, bg: 'bg-blue-50', color: 'text-blue-600' },
+    { label: 'Total Complaints', value: complaints.length.toString(), icon: <AlertTriangle size={20} className="text-orange-500" />, bg: 'bg-orange-50', color: 'text-orange-500' },
   ];
 
-  const barValue = (d: typeof monthlyData[0]) => {
+  const barValue = (d: MonthlyPoint) => {
     if (activeTab === 'collections') return d.collections;
-    if (activeTab === 'revenue') return d.revenue / 1000;
+    if (activeTab === 'revenue') return Math.round(d.revenue / 1000);
     return d.complaints;
   };
-  const maxVal = Math.max(...monthlyData.map(barValue));
+  const maxVal = Math.max(...monthlyData.map(barValue), 1);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="animate-spin text-green-600" size={32} />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -45,10 +127,7 @@ export default function ReportsPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map(k => (
           <div key={k.label} className={`${k.bg} rounded-2xl p-5`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">{k.icon}</div>
-              <span className={`text-xs font-semibold ${k.change.startsWith('+') ? 'text-green-600' : 'text-red-500'}`}>{k.change} vs last year</span>
-            </div>
+            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm mb-3">{k.icon}</div>
             <p className={`text-2xl font-bold ${k.color}`}>{k.value}</p>
             <p className="text-xs text-gray-500 mt-1">{k.label}</p>
           </div>
@@ -69,95 +148,92 @@ export default function ReportsPage() {
             ))}
           </div>
         </div>
-        <div className="flex items-end gap-3 h-48">
-          {monthlyData.map(d => {
-            const val = barValue(d);
-            const pct = (val / maxVal) * 100;
-            return (
-              <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
-                <span className="text-xs text-gray-500 font-medium">{activeTab === 'revenue' ? `${val}K` : val}</span>
-                <div className="w-full bg-gray-100 rounded-t-lg relative" style={{ height: '160px' }}>
-                  <div
-                    className="absolute bottom-0 w-full bg-green-500 rounded-t-lg transition-all duration-500"
-                    style={{ height: `${pct}%` }}
-                  />
+        {monthlyData.length === 0 ? (
+          <p className="text-center text-gray-400 text-sm py-12">No data yet.</p>
+        ) : (
+          <div className="flex items-end gap-3 h-48">
+            {monthlyData.map(d => {
+              const val = barValue(d);
+              const pct = (val / maxVal) * 100;
+              return (
+                <div key={d.month} className="flex-1 flex flex-col items-center gap-1">
+                  <span className="text-xs text-gray-500 font-medium">{activeTab === 'revenue' ? `${val}K` : val}</span>
+                  <div className="w-full bg-gray-100 rounded-t-lg relative" style={{ height: '160px' }}>
+                    <div className="absolute bottom-0 w-full bg-green-500 rounded-t-lg transition-all duration-500" style={{ height: `${pct}%` }} />
+                  </div>
+                  <span className="text-xs text-gray-500">{d.month}</span>
                 </div>
-                <span className="text-xs text-gray-500">{d.month}</span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Zone breakdown */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="font-bold text-gray-800 flex items-center gap-2">
-            <TrendingUp size={18} className="text-blue-600" /> Zone Performance Breakdown
+            <TrendingUp size={18} className="text-blue-600" /> District Breakdown
           </h2>
-          <button className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-50 transition">
+          <button onClick={() => exportCSV(zoneData)} className="flex items-center gap-2 px-3 py-1.5 border border-gray-200 text-gray-600 rounded-xl text-xs font-medium hover:bg-gray-50 transition">
             <Download size={14} /> Export CSV
           </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
-              <tr>{['Zone', 'Households', 'Collection Rate', 'Revenue', 'Complaints', 'Performance'].map(h => <th key={h} className="px-6 py-3 text-left">{h}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {zoneData.map(z => (
-                <tr key={z.zone} className="hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 font-medium text-gray-800">{z.zone}</td>
-                  <td className="px-6 py-4 text-gray-600">{z.households.toLocaleString()}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 bg-gray-100 rounded-full h-2">
-                        <div className="bg-green-500 h-2 rounded-full" style={{ width: `${z.collected}%` }} />
+        {zoneData.length === 0 ? (
+          <p className="text-center text-gray-400 text-sm py-10">No household data yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                <tr>{['District', 'Households', 'Share', 'Revenue (RWF)', 'Complaints'].map(h => <th key={h} className="px-6 py-3 text-left">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {zoneData.map(z => (
+                  <tr key={z.zone} className="hover:bg-gray-50 transition">
+                    <td className="px-6 py-4 font-medium text-gray-800">{z.zone}</td>
+                    <td className="px-6 py-4 text-gray-600">{z.households}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 bg-gray-100 rounded-full h-2">
+                          <div className="bg-green-500 h-2 rounded-full" style={{ width: `${(z.households / maxHouseholds) * 100}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-600">{Math.round((z.households / households.length) * 100)}%</span>
                       </div>
-                      <span className="text-xs text-gray-600">{z.collected}%</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 font-semibold text-gray-800">{z.revenue}</td>
-                  <td className="px-6 py-4 text-gray-600">{z.complaints}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${z.collected >= 85 ? 'bg-green-100 text-green-700' : z.collected >= 70 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                      {z.collected >= 85 ? 'Excellent' : z.collected >= 70 ? 'Good' : 'Needs Attention'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </td>
+                    <td className="px-6 py-4 font-semibold text-gray-800">{z.revenue.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-gray-600">{z.complaints}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Driver performance */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Users size={18} className="text-green-600" /> Top Performing Drivers
-        </h2>
-        <div className="space-y-3">
-          {[
-            { name: 'Nkurunziza Pierre', routes: 245, rating: 4.8, zone: 'Kicukiro' },
-            { name: 'Mutesi Diane', routes: 178, rating: 4.7, zone: 'Remera' },
-            { name: 'Uwase Claudine', routes: 198, rating: 4.6, zone: 'Gasabo' },
-            { name: 'Hakizimana Robert', routes: 156, rating: 4.5, zone: 'Nyarugenge' },
-          ].map((d, i) => (
-            <div key={d.name} className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${i === 0 ? 'bg-yellow-400' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-orange-400' : 'bg-green-500'}`}>
-                {i + 1}
+      {/* Drivers */}
+      {drivers.length > 0 && (
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h2 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <Users size={18} className="text-green-600" /> Drivers
+          </h2>
+          <div className="space-y-3">
+            {drivers.slice(0, 5).map((d, i) => (
+              <div key={d.id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ${i === 0 ? 'bg-yellow-400' : i === 1 ? 'bg-gray-400' : i === 2 ? 'bg-orange-400' : 'bg-green-500'}`}>
+                  {i + 1}
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-800 text-sm">{d.name}</p>
+                  <p className="text-xs text-gray-500">{d.company_name ?? '—'} {d.zone ? `• ${d.zone}` : ''}</p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${d.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {d.status ?? 'active'}
+                </span>
               </div>
-              <div className="flex-1">
-                <p className="font-medium text-gray-800 text-sm">{d.name}</p>
-                <p className="text-xs text-gray-500">{d.zone} • {d.routes} routes completed</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-yellow-500">★ {d.rating}</p>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
