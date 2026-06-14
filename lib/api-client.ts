@@ -4,16 +4,16 @@
 const ALLOWED_ORIGINS = [
   "http://localhost:8000",
   "http://192.168.56.1:8000",
-  "https://backend-waste-collection-management.onrender.com",
+  "https://waste-collection-backend.andasy.dev",
 ];
 
 export const API_BASE_URL = (() => {
   const raw = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/+$/, "") ||
-    "https://backend-waste-collection-management.onrender.com";
+    "https://waste-collection-backend.andasy.dev";
   // Validate the base URL is in the allowlist (SSRF fix)
   if (typeof window !== "undefined" && !ALLOWED_ORIGINS.some(o => raw.startsWith(o))) {
     console.warn("[EcoTrack] API_BASE_URL not in allowlist, using default.");
-    return "https://backend-waste-collection-management.onrender.com";
+    return "https://waste-collection-backend.andasy.dev";
   }
   return raw;
 })();
