@@ -1,428 +1,406 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  CreditCard, Calendar, CheckCircle, Clock, ArrowRight,
-  Smartphone, Building2, ChevronRight, X,
-  Shield, Check, Loader2, Receipt, TrendingUp,
-} from 'lucide-react';
-
-/* ── Types ── */
-type PayMethod = 'mtn' | 'airtel' | 'bank' | 'card';
-type Step = 1 | 2 | 3 | 4;
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { CreditCard, CheckCircle, Clock, AlertCircle, Loader2, Phone, X, RefreshCw } from 'lucide-react';
 
 interface Payment {
   id: number;
-  month: string;
-  date: string;
-  amount: string;
-  amountNum: number;
-  status: 'Paid' | 'Pending' | 'Overdue';
+  amount: number;
+  status: 'Paid' | 'Pending' | 'Overdue' | 'Failed';
   method: string;
-  ref: string;
+  month: string;
+  payment_date?: string;
+  transaction_ref?: string;
+  paypack_ref?: string;
+  created_at?: string;
 }
 
-/* ── Mock data ── */
-const MONTHLY_FEE = 3000;
+interface Summary {
+  paid_count: string;
+  pending_count: string;
+  overdue_count: string;
+  total_paid: string;
+}
 
-const payments: Payment[] = [
-  { id: 1, month: 'January 2025', date: '2025-01-15', amount: '3,000 RWF', amountNum: 3000, status: 'Paid', method: 'MTN Mobile Money', ref: 'TXN-240115-001' },
-  { id: 2, month: 'December 2024', date: '2024-12-15', amount: '3,000 RWF', amountNum: 3000, status: 'Paid', method: 'Airtel Money', ref: 'TXN-241215-002' },
-  { id: 3, month: 'November 2024', date: '2024-11-15', amount: '3,000 RWF', amountNum: 3000, status: 'Paid', method: 'Bank Transfer', ref: 'TXN-241115-003' },
-  { id: 4, month: 'February 2025', date: '2025-02-15', amount: '3,000 RWF', amountNum: 3000, status: 'Pending', method: '—', ref: '—' },
-];
+type Step = 'form' | 'waiting' | 'success' | 'failed';
 
-const now = new Date();
-const thisMonthName = now.toLocaleString('default', { month: 'long', year: 'numeric' });
-const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-const nextMonthName = nextMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
-const nextDueDate = new Date(now.getFullYear(), now.getMonth() + 1, 15)
-  .toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' });
-const thisDueDate = new Date(now.getFullYear(), now.getMonth(), 15)
-  .toLocaleDateString('en-RW', { day: 'numeric', month: 'short', year: 'numeric' });
-
-const payMethods = [
-  { id: 'mtn' as PayMethod, name: 'MTN Mobile Money', icon: '🟡', color: 'border-yellow-400 bg-yellow-50', desc: 'Pay via MTN MoMo', placeholder: '078XXXXXXX' },
-  { id: 'airtel' as PayMethod, name: 'Airtel Money', icon: '🔴', color: 'border-red-400 bg-red-50', desc: 'Pay via Airtel Money', placeholder: '073XXXXXXX' },
-  { id: 'bank' as PayMethod, name: 'Bank Transfer', icon: '🏦', color: 'border-blue-400 bg-blue-50', desc: 'Transfer from your bank', placeholder: 'Account number' },
-  { id: 'card' as PayMethod, name: 'Debit / Credit Card', icon: '💳', color: 'border-purple-400 bg-purple-50', desc: 'Visa, Mastercard', placeholder: '1234 5678 9012 3456' },
-];
-
-const statusStyle: Record<string, string> = {
+const STATUS_STYLES: Record<string, string> = {
   Paid: 'bg-green-100 text-green-700',
   Pending: 'bg-yellow-100 text-yellow-700',
   Overdue: 'bg-red-100 text-red-700',
+  Failed: 'bg-gray-100 text-gray-500',
 };
 
-/* ── Component ── */
+const BACKEND = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'https://backend-waste-collection-management.onrender.com').replace(/\/+$/, '');
+
+function getToken(): string | null {
+  return typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null;
+}
+
+async function backendFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const res = await fetch(`${BACKEND}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init.headers ?? {}),
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.message || `Error ${res.status}`);
+  return data as T;
+}
+
+function formatMonth(value: string): string {
+  if (!value) return '';
+  const [year, month] = value.split('-');
+  return new Date(Number(year), Number(month) - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+}
+
 export default function PaymentsPage() {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [payingMonth, setPayingMonth] = useState<'this' | 'next'>('this');
-  const [step, setStep] = useState<Step>(1);
-  const [selectedMethod, setSelectedMethod] = useState<PayMethod | null>(null);
-  const [phoneOrAccount, setPhoneOrAccount] = useState('');
-  const [processing, setProcessing] = useState(false);
-  const [paidList, setPaidList] = useState<string[]>([]);
-  const [successRef, setSuccessRef] = useState('');
+  const [step, setStep] = useState<Step>('form');
+  const [form, setForm] = useState({ number: '', month: '', amount: '3000' });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [activeRef, setActiveRef] = useState('');
+  const [pollSeconds, setPollSeconds] = useState(0);
+  const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const thisMonthPaid = paidList.includes('this') || payments.find(p => p.month === thisMonthName)?.status === 'Paid';
-  const nextMonthPaid = paidList.includes('next');
-  const totalPaidYear = payments.filter(p => p.status === 'Paid').length * MONTHLY_FEE + paidList.length * MONTHLY_FEE;
+  const loadPayments = useCallback(async () => {
+    try {
+      const [p, s] = await Promise.all([
+        backendFetch<Payment[]>('/api/payments/me'),
+        backendFetch<Summary>('/api/payments/me/summary'),
+      ]);
+      setPayments(p);
+      setSummary(s);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }, []);
 
-  const openPayment = (month: 'this' | 'next') => {
-    setPayingMonth(month);
-    setStep(1);
-    setSelectedMethod(null);
-    setPhoneOrAccount('');
-    setProcessing(false);
-    setSuccessRef('');
+  useEffect(() => { loadPayments(); }, [loadPayments]);
+
+  const stopPolling = useCallback(() => {
+    if (pollInterval.current) { clearInterval(pollInterval.current); pollInterval.current = null; }
+    if (countInterval.current) { clearInterval(countInterval.current); countInterval.current = null; }
+  }, []);
+
+  const startPolling = useCallback((ref: string) => {
+    stopPolling();
+    setPollSeconds(0);
+
+    countInterval.current = setInterval(() => setPollSeconds(s => s + 1), 1000);
+
+    pollInterval.current = setInterval(async () => {
+      try {
+        const token = getToken();
+        const res = await fetch(`${BACKEND}/api/paypack/status/${encodeURIComponent(ref)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data.status === 'Paid') {
+          stopPolling();
+          setStep('success');
+          await loadPayments();
+        } else if (data.status === 'Failed') {
+          stopPolling();
+          setStep('failed');
+          await loadPayments();
+        }
+      } catch { /* keep polling */ }
+    }, 4000);
+  }, [stopPolling, loadPayments]);
+
+  // Auto-timeout after 3 minutes
+  useEffect(() => {
+    if (step !== 'waiting') return;
+    const timeout = setTimeout(() => {
+      stopPolling();
+      setStep('failed');
+      setError('Payment timed out. The USSD prompt was not confirmed within 3 minutes.');
+    }, 3 * 60 * 1000);
+    return () => clearTimeout(timeout);
+  }, [step, stopPolling]);
+
+  useEffect(() => () => stopPolling(), [stopPolling]);
+
+  const openModal = () => {
+    setStep('form');
+    setError('');
+    setActiveRef('');
     setShowModal(true);
   };
 
   const closeModal = () => {
+    if (step === 'waiting') {
+      stopPolling();
+      loadPayments();
+    }
     setShowModal(false);
-    setStep(1);
-    setSelectedMethod(null);
-    setPhoneOrAccount('');
   };
 
-  const handleNext = () => {
-    if (step === 1 && !selectedMethod) return;
-    if (step === 2 && !phoneOrAccount.trim()) return;
-    if (step < 4) setStep((s) => (s + 1) as Step);
+  const handlePay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    if (!/^07[2389]\d{7}$/.test(form.number)) {
+      setError('Enter a valid Rwanda mobile number (MTN: 078/079, Airtel: 072/073)');
+      return;
+    }
+    if (!form.month) { setError('Please select a payment month'); return; }
+    const amount = Number(form.amount);
+    if (!amount || amount < 100) { setError('Minimum amount is 100 RWF'); return; }
+
+    setSubmitting(true);
+    try {
+      const data = await backendFetch<{ message: string; payment: Payment; paypack: { ref: string } }>(
+        '/api/paypack/cashin',
+        {
+          method: 'POST',
+          body: JSON.stringify({ number: form.number, month: formatMonth(form.month), amount }),
+        }
+      );
+      setActiveRef(data.paypack.ref);
+      setStep('waiting');
+      startPolling(data.paypack.ref);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Payment failed. Try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleConfirmPayment = async () => {
-    setProcessing(true);
-    await new Promise(r => setTimeout(r, 2500));
-    const ref = `TXN-${Date.now().toString().slice(-8)}`;
-    setSuccessRef(ref);
-    setPaidList(prev => [...prev, payingMonth]);
-    setProcessing(false);
-    setStep(4);
-  };
-
-  const method = payMethods.find(m => m.id === selectedMethod);
-  const amount = MONTHLY_FEE.toLocaleString() + ' RWF';
-  const monthLabel = payingMonth === 'this' ? thisMonthName : nextMonthName;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-green-600" size={32} />
+      </div>
+    );
+  }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 max-w-4xl mx-auto">
-
+    <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
-        <p className="text-gray-500 text-sm mt-1">Manage your monthly waste collection fee</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Payments</h1>
+          <p className="text-gray-500 text-sm">Pay your monthly waste collection fee via Mobile Money</p>
+        </div>
+        <button
+          onClick={openModal}
+          className="flex items-center gap-2 px-4 py-2 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition"
+        >
+          <CreditCard size={16} /> Pay Now
+        </button>
       </div>
 
-      {/* Monthly billing cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-        {/* This month */}
-        <div className={`rounded-2xl p-5 border-2 ${thisMonthPaid ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}>
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">This Month</p>
-              <p className="font-bold text-gray-800 mt-0.5">{thisMonthName}</p>
-            </div>
-            {thisMonthPaid
-              ? <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full"><Check size={12} /> Paid</span>
-              : <span className="flex items-center gap-1 text-xs font-semibold text-orange-700 bg-orange-100 px-2.5 py-1 rounded-full"><Clock size={12} /> Due {thisDueDate}</span>
-            }
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{MONTHLY_FEE.toLocaleString()} <span className="text-base font-medium text-gray-500">RWF</span></p>
-          <p className="text-xs text-gray-500 mt-1">Monthly waste collection fee</p>
-          {!thisMonthPaid && (
-            <button
-              onClick={() => openPayment('this')}
-              className="mt-4 w-full py-2.5 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 transition flex items-center justify-center gap-2"
-            >
-              Pay Now <ArrowRight size={15} />
-            </button>
-          )}
-          {thisMonthPaid && (
-            <div className="mt-4 flex items-center gap-2 text-green-700 text-sm font-medium">
-              <CheckCircle size={16} /> Payment confirmed
-            </div>
-          )}
-        </div>
-
-        {/* Next month */}
-        <div className={`rounded-2xl p-5 border-2 ${nextMonthPaid ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Next Month</p>
-              <p className="font-bold text-gray-800 mt-0.5">{nextMonthName}</p>
-            </div>
-            {nextMonthPaid
-              ? <span className="flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full"><Check size={12} /> Paid</span>
-              : <span className="flex items-center gap-1 text-xs font-semibold text-gray-600 bg-gray-200 px-2.5 py-1 rounded-full"><Calendar size={12} /> Due {nextDueDate}</span>
-            }
-          </div>
-          <p className="text-3xl font-bold text-gray-900">{MONTHLY_FEE.toLocaleString()} <span className="text-base font-medium text-gray-500">RWF</span></p>
-          <p className="text-xs text-gray-500 mt-1">Pay early to avoid interruptions</p>
-          {!nextMonthPaid && (
-            <button
-              onClick={() => openPayment('next')}
-              className="mt-4 w-full py-2.5 border-2 border-green-700 text-green-700 rounded-xl text-sm font-semibold hover:bg-green-50 transition flex items-center justify-center gap-2"
-            >
-              Pay in Advance <ArrowRight size={15} />
-            </button>
-          )}
-          {nextMonthPaid && (
-            <div className="mt-4 flex items-center gap-2 text-green-700 text-sm font-medium">
-              <CheckCircle size={16} /> Payment confirmed
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Summary stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Paid This Year', value: `${totalPaidYear.toLocaleString()} RWF`, icon: <TrendingUp size={16} className="text-green-600" />, bg: 'bg-green-50' },
-          { label: 'Next Due Date', value: nextDueDate, icon: <Calendar size={16} className="text-blue-600" />, bg: 'bg-blue-50' },
-          { label: 'Monthly Fee', value: `${MONTHLY_FEE.toLocaleString()} RWF`, icon: <CreditCard size={16} className="text-purple-600" />, bg: 'bg-purple-50' },
+          { label: 'Total Paid', value: `${Number(summary?.total_paid ?? 0).toLocaleString()} RWF`, icon: <CreditCard size={18} className="text-green-600" />, bg: 'bg-green-50' },
+          { label: 'Paid', value: summary?.paid_count ?? '0', icon: <CheckCircle size={18} className="text-blue-600" />, bg: 'bg-blue-50' },
+          { label: 'Pending', value: summary?.pending_count ?? '0', icon: <Clock size={18} className="text-yellow-600" />, bg: 'bg-yellow-50' },
+          { label: 'Overdue', value: summary?.overdue_count ?? '0', icon: <AlertCircle size={18} className="text-red-600" />, bg: 'bg-red-50' },
         ].map(s => (
-          <div key={s.label} className={`${s.bg} rounded-xl p-4`}>
-            <div className="flex items-center gap-2 mb-1">{s.icon}<p className="text-xs text-gray-500">{s.label}</p></div>
-            <p className="font-bold text-gray-800 text-sm">{s.value}</p>
+          <div key={s.label} className={`${s.bg} rounded-xl p-4 flex items-center gap-3`}>
+            <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center shadow-sm">{s.icon}</div>
+            <div>
+              <p className="text-xs text-gray-500">{s.label}</p>
+              <p className="font-bold text-gray-800">{s.value}</p>
+            </div>
           </div>
         ))}
       </div>
 
       {/* Payment history */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h2 className="font-bold text-gray-800 flex items-center gap-2">
-            <Receipt size={17} className="text-green-600" /> Payment History
-          </h2>
+        <div className="px-6 py-4 border-b flex items-center justify-between">
+          <h2 className="font-semibold text-gray-800">Payment History</h2>
+          <button onClick={loadPayments} className="text-gray-400 hover:text-gray-600 transition">
+            <RefreshCw size={15} />
+          </button>
         </div>
-        <div className="divide-y divide-gray-50">
-          {payments.map(p => (
-            <div key={p.id} className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <Calendar size={18} className="text-gray-500" />
-                </div>
+        {payments.length === 0 ? (
+          <p className="text-center py-10 text-gray-400 text-sm">No payments yet.</p>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {payments.map(p => (
+              <div key={p.id} className="flex items-center justify-between px-6 py-4">
                 <div>
-                  <p className="font-semibold text-gray-800 text-sm">{p.month}</p>
-                  <p className="text-xs text-gray-500">{p.method} {p.ref !== '—' && `• ${p.ref}`}</p>
+                  <p className="font-medium text-gray-800 text-sm">{p.month}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {p.method}
+                    {p.transaction_ref ? ` · ${p.transaction_ref.slice(0, 16)}…` : ''}
+                  </p>
+                  {p.payment_date && (
+                    <p className="text-xs text-gray-400">{new Date(p.payment_date).toLocaleDateString()}</p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-gray-800 text-sm">{Number(p.amount).toLocaleString()} RWF</p>
+                  <span className={`inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLES[p.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                    {p.status}
+                  </span>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-bold text-gray-800 text-sm">{p.amount}</p>
-                <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${statusStyle[p.status]}`}>{p.status}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* ── Payment Modal ── */}
+      {/* Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
 
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <div>
-                <p className="text-xs text-gray-500 font-medium">
-                  Step {step} of 3{step === 4 ? ' — Done' : ''}
-                </p>
-                <h3 className="font-bold text-gray-900">
-                  {step === 1 && 'Choose Payment Method'}
-                  {step === 2 && 'Enter Payment Details'}
-                  {step === 3 && 'Confirm Payment'}
-                  {step === 4 && 'Payment Successful!'}
-                </h3>
-              </div>
-              {step !== 4 && (
-                <button onClick={closeModal} className="p-2 rounded-full hover:bg-gray-100 transition">
-                  <X size={18} className="text-gray-500" />
-                </button>
-              )}
+            {/* Header */}
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="font-bold text-gray-800">
+                {step === 'form' && 'Pay via Mobile Money'}
+                {step === 'waiting' && 'Confirm on Your Phone'}
+                {step === 'success' && 'Payment Successful'}
+                {step === 'failed' && 'Payment Failed'}
+              </h3>
+              <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
             </div>
 
-            {/* Step indicators */}
-            {step < 4 && (
-              <div className="flex items-center gap-0 px-6 pt-4">
-                {[1, 2, 3].map((s) => (
-                  <React.Fragment key={s}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${step >= s ? 'bg-green-700 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                      {step > s ? <Check size={14} /> : s}
-                    </div>
-                    {s < 3 && <div className={`flex-1 h-1 mx-1 rounded-full ${step > s ? 'bg-green-700' : 'bg-gray-100'}`} />}
-                  </React.Fragment>
-                ))}
+            {/* Step: Form */}
+            {step === 'form' && (
+              <form onSubmit={handlePay} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Phone Number (MTN / Airtel)</label>
+                  <div className="relative">
+                    <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. 0781234567"
+                      value={form.number}
+                      onChange={e => setForm(f => ({ ...f, number: e.target.value }))}
+                      className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Payment Month</label>
+                  <input
+                    type="month"
+                    required
+                    value={form.month}
+                    onChange={e => setForm(f => ({ ...f, month: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Amount (RWF)</label>
+                  <input
+                    type="number"
+                    min="100"
+                    required
+                    value={form.amount}
+                    onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Standard fee: 3,000 RWF/month</p>
+                </div>
+                {error && <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+                <div className="flex gap-3 pt-1">
+                  <button type="button" onClick={closeModal} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition">
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 py-2.5 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition disabled:opacity-60 flex items-center justify-center gap-2"
+                  >
+                    {submitting ? <><Loader2 size={14} className="animate-spin" /> Sending…</> : 'Send USSD Prompt'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Step: Waiting for USSD confirmation */}
+            {step === 'waiting' && (
+              <div className="p-6 text-center space-y-5">
+                <div className="w-16 h-16 bg-yellow-50 rounded-full flex items-center justify-center mx-auto">
+                  <Phone size={28} className="text-yellow-500" />
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-800">Check your phone!</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    A USSD prompt has been sent to <span className="font-semibold text-gray-700">{form.number}</span>.
+                    Enter your Mobile Money PIN to confirm.
+                  </p>
+                </div>
+                <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-500 space-y-1">
+                  <p>Amount: <span className="font-semibold text-gray-700">{Number(form.amount).toLocaleString()} RWF</span></p>
+                  <p>Month: <span className="font-semibold text-gray-700">{formatMonth(form.month)}</span></p>
+                  <p className="font-mono text-gray-400">Ref: {activeRef}</p>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                  <Loader2 size={14} className="animate-spin text-green-600" />
+                  Waiting for confirmation… {pollSeconds}s
+                </div>
+                <button onClick={closeModal} className="text-xs text-gray-400 hover:text-gray-600 underline">
+                  Close (payment will complete in background)
+                </button>
               </div>
             )}
 
-            <div className="px-6 py-5">
-
-              {/* Step 1 — Choose method */}
-              {step === 1 && (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-500 mb-4">Paying <span className="font-bold text-gray-800">{amount}</span> for <span className="font-bold text-gray-800">{monthLabel}</span></p>
-                  {payMethods.map(m => (
-                    <button
-                      key={m.id}
-                      onClick={() => setSelectedMethod(m.id)}
-                      className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${selectedMethod === m.id ? m.color + ' border-opacity-100' : 'border-gray-200 hover:border-gray-300'}`}
-                    >
-                      <span className="text-2xl">{m.icon}</span>
-                      <div className="text-left flex-1">
-                        <p className="font-semibold text-gray-800 text-sm">{m.name}</p>
-                        <p className="text-xs text-gray-500">{m.desc}</p>
-                      </div>
-                      {selectedMethod === m.id && <Check size={18} className="text-green-700 flex-shrink-0" />}
-                    </button>
-                  ))}
+            {/* Step: Success */}
+            {step === 'success' && (
+              <div className="p-6 text-center space-y-5">
+                <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto">
+                  <CheckCircle size={32} className="text-green-600" />
                 </div>
-              )}
-
-              {/* Step 2 — Enter details */}
-              {step === 2 && method && (
-                <div className="space-y-5">
-                  <div className={`flex items-center gap-3 p-4 rounded-2xl ${method.color} border-2`}>
-                    <span className="text-2xl">{method.icon}</span>
-                    <div>
-                      <p className="font-semibold text-gray-800 text-sm">{method.name}</p>
-                      <p className="text-xs text-gray-500">{amount} for {monthLabel}</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                      {selectedMethod === 'card' ? 'Card Number' : selectedMethod === 'bank' ? 'Account Number' : 'Phone Number'}
-                    </label>
-                    <input
-                      type={selectedMethod === 'card' ? 'text' : 'tel'}
-                      value={phoneOrAccount}
-                      onChange={e => setPhoneOrAccount(e.target.value)}
-                      placeholder={method.placeholder}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                      maxLength={selectedMethod === 'card' ? 19 : 13}
-                    />
-                  </div>
-
-                  {(selectedMethod === 'mtn' || selectedMethod === 'airtel') && (
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 flex items-start gap-2">
-                      <Smartphone size={14} className="mt-0.5 flex-shrink-0" />
-                      You will receive a USSD prompt on your phone to approve the payment of <strong>{amount}</strong>.
-                    </div>
-                  )}
-                  {selectedMethod === 'bank' && (
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800 flex items-start gap-2">
-                      <Building2 size={14} className="mt-0.5 flex-shrink-0" />
-                      Transfer <strong>{amount}</strong> to EcoTrack Bank Account: <strong>100-200-300</strong> — BK Rwanda.
-                    </div>
-                  )}
-                  {selectedMethod === 'card' && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">Expiry Date</label>
-                          <input type="text" placeholder="MM / YY" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" maxLength={7} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1.5">CVV</label>
-                          <input type="password" placeholder="•••" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" maxLength={3} />
-                        </div>
-                      </div>
-                      <input type="text" placeholder="Cardholder name" className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                    </div>
-                  )}
+                <div>
+                  <p className="font-bold text-gray-800 text-lg">Payment Confirmed!</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Your payment of <span className="font-semibold">{Number(form.amount).toLocaleString()} RWF</span> for{' '}
+                    <span className="font-semibold">{formatMonth(form.month)}</span> was successful.
+                  </p>
                 </div>
-              )}
+                <p className="font-mono text-xs text-gray-400">Ref: {activeRef}</p>
+                <button
+                  onClick={closeModal}
+                  className="w-full py-2.5 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition"
+                >
+                  Done
+                </button>
+              </div>
+            )}
 
-              {/* Step 3 — Confirm */}
-              {step === 3 && method && (
-                <div className="space-y-4">
-                  <div className="bg-gray-50 rounded-2xl p-5 space-y-3">
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Payment Summary</p>
-                    {[
-                      ['Month', monthLabel],
-                      ['Amount', amount],
-                      ['Method', method.name],
-                      ['Account', phoneOrAccount],
-                      ['Date', new Date().toLocaleDateString('en-RW', { day: 'numeric', month: 'long', year: 'numeric' })],
-                    ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between text-sm">
-                        <span className="text-gray-500">{k}</span>
-                        <span className="font-semibold text-gray-800">{v}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-xl p-3 text-xs text-green-800">
-                    <Shield size={14} className="mt-0.5 flex-shrink-0" />
-                    Your payment is secured and encrypted. EcoTrack does not store your payment credentials.
-                  </div>
+            {/* Step: Failed */}
+            {step === 'failed' && (
+              <div className="p-6 text-center space-y-5">
+                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto">
+                  <X size={32} className="text-red-500" />
                 </div>
-              )}
-
-              {/* Step 4 — Success */}
-              {step === 4 && (
-                <div className="text-center py-4 space-y-4">
-                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                    <CheckCircle size={40} className="text-green-600" />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-bold text-gray-900">Payment Successful!</h4>
-                    <p className="text-gray-500 text-sm mt-1">Your payment for <strong>{monthLabel}</strong> has been confirmed.</p>
-                  </div>
-                  <div className="bg-gray-50 rounded-2xl p-4 text-sm space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Amount paid</span>
-                      <span className="font-bold text-gray-800">{amount}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Reference</span>
-                      <span className="font-mono text-xs text-gray-800">{successRef}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Method</span>
-                      <span className="font-semibold text-gray-800">{method?.name}</span>
-                    </div>
-                  </div>
-                  <button onClick={closeModal} className="w-full py-3 bg-green-700 text-white rounded-xl font-semibold hover:bg-green-800 transition">
-                    Done
+                <div>
+                  <p className="font-bold text-gray-800 text-lg">Payment Failed</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {error || 'The payment was not completed. You may have declined or the request timed out.'}
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={closeModal} className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition">
+                    Close
                   </button>
-                </div>
-              )}
-            </div>
-
-            {/* Footer buttons */}
-            {step < 4 && (
-              <div className="flex gap-3 px-6 pb-6">
-                {step > 1 && (
-                  <button onClick={() => setStep(s => (s - 1) as Step)} className="flex-1 py-3 border border-gray-200 text-gray-600 rounded-xl text-sm font-semibold hover:bg-gray-50 transition">
-                    Back
-                  </button>
-                )}
-                {step < 3 && (
                   <button
-                    onClick={handleNext}
-                    disabled={(step === 1 && !selectedMethod) || (step === 2 && !phoneOrAccount.trim())}
-                    className="flex-1 py-3 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    onClick={() => { setStep('form'); setError(''); }}
+                    className="flex-1 py-2.5 bg-green-700 text-white rounded-xl text-sm font-medium hover:bg-green-800 transition"
                   >
-                    Continue <ChevronRight size={16} />
+                    Try Again
                   </button>
-                )}
-                {step === 3 && (
-                  <button
-                    onClick={handleConfirmPayment}
-                    disabled={processing}
-                    className="flex-1 py-3 bg-green-700 text-white rounded-xl text-sm font-semibold hover:bg-green-800 transition disabled:opacity-60 flex items-center justify-center gap-2"
-                  >
-                    {processing ? (
-                      <><Loader2 size={16} className="animate-spin" /> Processing...</>
-                    ) : (
-                      <><Shield size={15} /> Confirm & Pay</>
-                    )}
-                  </button>
-                )}
+                </div>
               </div>
             )}
 
