@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
-  Truck, Users, Building2, MapPin, CreditCard,
+  Truck, Users, Building2, CreditCard,
   MessageSquare, BarChart3, Settings, Home,
   LogOut, Menu, X, ChevronRight, ClipboardList, PackagePlus,
 } from 'lucide-react';
@@ -13,7 +13,6 @@ const navItems = [
   { label: 'Households', icon: Users, href: '/admin/households' },
   { label: 'Waste Companies', icon: Building2, href: '/admin/company-approvals' },
   { label: 'Applications', icon: ClipboardList, href: '/admin/applications' },
-  { label: 'Routes', icon: MapPin, href: '/admin/routes' },
   { label: 'Payments', icon: CreditCard, href: '/admin/payments' },
   { label: 'Complaints', icon: MessageSquare, href: '/admin/complaints' },
   { label: 'Pickup Requests', icon: PackagePlus, href: '/admin/pickup-requests' },
