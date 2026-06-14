@@ -6,7 +6,7 @@ import {
   Calendar, CreditCard, Bell,
   AlertCircle, CheckCircle, Trash2,
   MapPin, User, ArrowRight, Truck,
-  DollarSign, MessageSquare, Route, Loader2,
+  DollarSign, MessageSquare, Loader2,
 } from 'lucide-react';
 import {
   api,
@@ -368,10 +368,9 @@ export default function UserDashboard() {
         <h2 className="font-bold text-gray-800 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Schedule',   icon: Calendar,     color: 'text-blue-600 bg-blue-50 hover:bg-blue-100',     href: '/User-Dashboard/Schedule' },
-            { label: 'Route',      icon: Route,        color: 'text-green-600 bg-green-50 hover:bg-green-100',   href: '/User-Dashboard/Route' },
-            { label: 'Payments',   icon: CreditCard,   color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', href: '/User-Dashboard/Payments' },
-            { label: 'Complaints', icon: MessageSquare, color: 'text-red-600 bg-red-50 hover:bg-red-100',        href: '/User-Dashboard/Complaints' },
+            { label: 'Schedule',   icon: Calendar,      color: 'text-blue-600 bg-blue-50 hover:bg-blue-100',      href: '/User-Dashboard/Schedule' },
+            { label: 'Payments',   icon: CreditCard,    color: 'text-orange-600 bg-orange-50 hover:bg-orange-100', href: '/User-Dashboard/Payments' },
+            { label: 'Complaints', icon: MessageSquare, color: 'text-red-600 bg-red-50 hover:bg-red-100',          href: '/User-Dashboard/Complaints' },
           ].map(({ label, icon: Icon, color, href }) => (
             <button
               key={label}
