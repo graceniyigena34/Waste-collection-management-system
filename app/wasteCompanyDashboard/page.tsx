@@ -7,10 +7,10 @@ import {
   Car, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
   Clock, AlertTriangle, Bell, Plus,
-  CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send, PackagePlus, Zap,
+  CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send, PackagePlus, Zap, CreditCard,
 } from "lucide-react";
 import { isWasteCollectorRole } from "@/lib/company-application";
-import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendPickupRequest, type BackendAssignment, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, getStoredUserInfo } from "@/lib/api-client";
+import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendPickupRequest, type BackendAssignment, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, type BackendPayment, getStoredUserInfo } from "@/lib/api-client";
 import NotificationBell from "@/components/NotificationBell";
 import { rwandaAdminData, getCellsBySector, getSectorsByDistrict } from "@/data/rwanda-admin";
 
@@ -124,6 +124,11 @@ export default function WasteCompanyDashboard() {
   const [citizens, setCitizens] = useState<BackendHousehold[]>([]);
   const [citizensLoading, setCitizensLoading] = useState(false);
   const [citizensError, setCitizensError] = useState("");
+  const [companyPayments, setCompanyPayments] = useState<BackendPayment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsSearch, setPaymentsSearch] = useState("");
+  const [paymentsFilter, setPaymentsFilter] = useState("All");
+  const [selectedPayment, setSelectedPayment] = useState<BackendPayment | null>(null);
   const [citizenSearch, setCitizenSearch] = useState("");
 
   const [chatConversations, setChatConversations] = useState<BackendConversationSummary[]>([]);
@@ -302,6 +307,18 @@ export default function WasteCompanyDashboard() {
     };
     void loadCitizens();
   }, [application?.district]);
+
+  useEffect(() => {
+    if (!application?.district) return;
+    setPaymentsLoading(true);
+    api.payments.all()
+      .then(data => {
+        const citizenUserIds = new Set(citizens.map(c => c.user_id));
+        setCompanyPayments(data.filter(p => citizenUserIds.has(p.user_id ?? -1)));
+      })
+      .catch(() => setCompanyPayments([]))
+      .finally(() => setPaymentsLoading(false));
+  }, [application?.district, citizens]);
 
   const handleRespond = async () => {
     if (!respondTarget || !respondNote.trim()) {
@@ -1111,6 +1128,7 @@ export default function WasteCompanyDashboard() {
             { label: "Pickup Requests", icon: PackagePlus, target: "pickup-requests-section" },
             { label: "Chat", icon: MessageCircle, target: "chat-section" },
             { label: "Citizens", icon: Building2, target: "citizens-section" },
+            { label: "Payments", icon: CreditCard, target: "payments-section" },
             { label: "Settings", icon: Settings, target: "settings-section" },
           ].map(({ label, icon: Icon, target }) => {
             const active = activeSection === target;
@@ -2140,6 +2158,164 @@ export default function WasteCompanyDashboard() {
               )}
             </Card>
           </div>
+
+          {/* ── Payments Section ── */}
+          <div className={`scroll-mt-28 ${activeSection !== "top-section" && activeSection !== "payments-section" ? "hidden" : ""}`} id="payments-section">
+            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={18} className="text-emerald-600" />
+                  <h2 className="font-bold text-gray-900">Citizen Payments</h2>
+                  {!paymentsLoading && (
+                    <span className="ml-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">{companyPayments.length}</span>
+                  )}
+                </div>
+                {/* Stats chips */}
+                <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                  {[
+                    { label: "Paid", color: "bg-green-100 text-green-700", count: companyPayments.filter(p => p.status === "Paid").length },
+                    { label: "Pending", color: "bg-yellow-100 text-yellow-700", count: companyPayments.filter(p => p.status === "Pending").length },
+                    { label: "Overdue", color: "bg-red-100 text-red-700", count: companyPayments.filter(p => p.status === "Overdue").length },
+                  ].map(s => (
+                    <span key={s.label} className={`px-3 py-1 rounded-full ${s.color}`}>{s.label}: {paymentsLoading ? "…" : s.count}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Revenue summary */}
+              {!paymentsLoading && companyPayments.length > 0 && (() => {
+                const totalRevenue = companyPayments.filter(p => p.status === "Paid").reduce((s, p) => s + Number(p.amount), 0);
+                return (
+                  <div className="px-6 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2 text-sm text-emerald-800">
+                    <CreditCard size={14} className="text-emerald-600" />
+                    <span>Total collected from your citizens: <strong>{totalRevenue.toLocaleString()} RWF</strong></span>
+                  </div>
+                );
+              })()}
+
+              {/* Search + filter */}
+              <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap gap-3 items-center">
+                <div className="relative flex-1 min-w-[180px]">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" /></svg>
+                  <input
+                    value={paymentsSearch}
+                    onChange={e => setPaymentsSearch(e.target.value)}
+                    placeholder="Search by name or zone…"
+                    className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"
+                  />
+                </div>
+                <select
+                  value={paymentsFilter}
+                  onChange={e => setPaymentsFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50"
+                >
+                  {["All", "Paid", "Pending", "Overdue", "Failed"].map(s => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+
+              {/* Table */}
+              {paymentsLoading ? (
+                <div className="flex items-center justify-center py-16 text-gray-400">
+                  <svg className="animate-spin w-6 h-6 mr-2 text-emerald-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  Loading payments…
+                </div>
+              ) : (() => {
+                const rows = companyPayments.filter(p =>
+                  (paymentsFilter === "All" || p.status === paymentsFilter) &&
+                  (
+                    (p.full_name ?? "").toLowerCase().includes(paymentsSearch.toLowerCase()) ||
+                    (p.zone ?? "").toLowerCase().includes(paymentsSearch.toLowerCase()) ||
+                    String(p.id).includes(paymentsSearch)
+                  )
+                );
+                if (rows.length === 0) return (
+                  <div className="py-16 text-center text-gray-400 text-sm">
+                    <CreditCard size={36} className="mx-auto mb-2 opacity-20" />
+                    {companyPayments.length === 0 ? "No payment records for your citizens yet." : "No payments match your search."}
+                  </div>
+                );
+                const statusStyle: Record<string, string> = {
+                  Paid: "bg-green-100 text-green-700",
+                  Pending: "bg-yellow-100 text-yellow-700",
+                  Overdue: "bg-red-100 text-red-700",
+                  Failed: "bg-gray-100 text-gray-500",
+                };
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                        <tr>
+                          {["#", "Citizen", "Zone", "Amount", "Method", "Month", "Status", ""].map(h => (
+                            <th key={h} className="px-5 py-3 text-left">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {rows.map(p => (
+                          <tr key={p.id} className="hover:bg-gray-50 transition">
+                            <td className="px-5 py-4 font-mono text-xs text-gray-400">#{String(p.id).padStart(3, "0")}</td>
+                            <td className="px-5 py-4">
+                              <p className="font-medium text-gray-900">{p.full_name ?? `User #${p.user_id}`}</p>
+                            </td>
+                            <td className="px-5 py-4 text-gray-500">{p.zone ?? "—"}</td>
+                            <td className="px-5 py-4 font-semibold text-gray-800">{Number(p.amount).toLocaleString()} RWF</td>
+                            <td className="px-5 py-4 text-gray-500">{p.method ?? "—"}</td>
+                            <td className="px-5 py-4 text-gray-500 text-xs">{p.month ?? (p.payment_date ? new Date(p.payment_date).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "—")}</td>
+                            <td className="px-5 py-4">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusStyle[p.status] ?? "bg-gray-100 text-gray-500"}`}>
+                                {p.status}
+                              </span>
+                            </td>
+                            <td className="px-5 py-4">
+                              <button onClick={() => setSelectedPayment(p)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition"><Eye size={15} /></button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Payment detail modal */}
+          {selectedPayment && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl">
+                <div className="flex items-center justify-between px-6 py-4 border-b">
+                  <h3 className="font-bold text-gray-800 flex items-center gap-2"><CreditCard size={16} className="text-emerald-600" /> Payment Details</h3>
+                  <button onClick={() => setSelectedPayment(null)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+                </div>
+                <div className="p-6 space-y-3">
+                  {([
+                    ["Payment ID", `#${String(selectedPayment.id).padStart(3, "0")}`],
+                    ["Citizen", selectedPayment.full_name ?? `User #${selectedPayment.user_id}`],
+                    ["Zone", selectedPayment.zone ?? "—"],
+                    ["Amount", `${Number(selectedPayment.amount).toLocaleString()} RWF`],
+                    ["Method", selectedPayment.method ?? "—"],
+                    ["Month", selectedPayment.month ?? "—"],
+                    ["Date", selectedPayment.payment_date ? new Date(selectedPayment.payment_date).toLocaleDateString("en-RW", { day: "2-digit", month: "short", year: "numeric" }) : "—"],
+                  ] as [string, string][]).map(([k, v]) => (
+                    <div key={k} className="flex justify-between text-sm">
+                      <span className="text-gray-500">{k}</span>
+                      <span className="font-medium text-gray-800">{v}</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Status</span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${{ Paid: "bg-green-100 text-green-700", Pending: "bg-yellow-100 text-yellow-700", Overdue: "bg-red-100 text-red-700", Failed: "bg-gray-100 text-gray-500" }[selectedPayment.status] ?? ""}`}>
+                      {selectedPayment.status}
+                    </span>
+                  </div>
+                </div>
+                <div className="px-6 pb-6">
+                  <button onClick={() => setSelectedPayment(null)} className="w-full py-2.5 bg-emerald-700 text-white rounded-xl text-sm font-semibold hover:bg-emerald-800 transition">Close</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* ── Settings Section ── */}
           <div className={`scroll-mt-28 ${activeSection !== "top-section" && activeSection !== "settings-section" ? "hidden" : ""}`} id="settings-section">
