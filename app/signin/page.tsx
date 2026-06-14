@@ -3,14 +3,13 @@
 import { useState, ChangeEvent, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Truck, Eye, EyeOff, Mail, Lock, ChevronDown } from "lucide-react";
+import { Truck, Eye, EyeOff, Mail, Lock } from "lucide-react";
 import Image from "next/image";
 import { api, storeAuth } from "@/lib/api-client";
 
 interface SigninForm {
   email: string;
   password: string;
-  role: "citizen" | "collector" | "admin";
 }
 
 export default function Signin() {
@@ -18,7 +17,6 @@ export default function Signin() {
   const [formData, setFormData] = useState<SigninForm>({
     email: "",
     password: "",
-    role: "citizen",
   });
   const [error, setError] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
@@ -43,25 +41,6 @@ export default function Signin() {
         email: formData.email.trim(),
         password: formData.password,
       });
-
-      // Validate selected role matches actual account type
-      const roleMap: Record<string, string> = {
-        citizen: "citizen",
-        collector: "waste_collector",
-        admin: "admin",
-      };
-      if (roleMap[formData.role] !== res.user.role) {
-        const roleLabels: Record<string, string> = {
-          citizen: "Citizen",
-          waste_collector: "Waste Company",
-          admin: "Admin",
-        };
-        setError(
-          `This account is registered as "${roleLabels[res.user.role] ?? res.user.role}". Please select the correct account type.`
-        );
-        setLoading(false);
-        return;
-      }
 
       storeAuth(res);
 
@@ -179,24 +158,6 @@ export default function Signin() {
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
-              </div>
-            </div>
-
-            {/* Role */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Sign in as</label>
-              <div className="relative">
-                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition bg-white"
-                >
-                  <option value="citizen">Citizen</option>
-                  <option value="collector">Waste Company</option>
-                  <option value="admin">Admin</option>
-                </select>
               </div>
             </div>
 
