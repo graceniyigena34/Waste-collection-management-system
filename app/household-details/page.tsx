@@ -28,8 +28,12 @@ function getStoredUserFirstName() {
 export default function HouseholdDetailsPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const userName = getStoredUserFirstName();
+  const [userName, setUserName] = useState("there");
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    setUserName(getStoredUserFirstName());
+  }, []);
 
   /* ── location fields ── */
   const [districtId, setDistrictId] = useState("");
