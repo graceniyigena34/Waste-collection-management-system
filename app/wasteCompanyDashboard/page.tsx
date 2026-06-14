@@ -90,11 +90,16 @@ export default function WasteCompanyDashboard() {
   const [activeSection, setActiveSection] = useState<string>("top-section");
 
   const [autoScheduleModal, setAutoScheduleModal] = useState(false);
+  const [autoScheduleTab, setAutoScheduleTab] = useState<"requests" | "citizens">("requests");
   const [autoScheduleSelected, setAutoScheduleSelected] = useState<Set<number>>(new Set());
   const [autoScheduleDriver, setAutoScheduleDriver] = useState("");
   const [autoScheduleVehicle, setAutoScheduleVehicle] = useState("");
   const [autoScheduleSaving, setAutoScheduleSaving] = useState(false);
   const [autoScheduleError, setAutoScheduleError] = useState("");
+  const [autoScheduleCitizenDate, setAutoScheduleCitizenDate] = useState(new Date().toISOString().slice(0, 10));
+  const [autoScheduleCitizenTime, setAutoScheduleCitizenTime] = useState("08:00");
+  const [autoScheduleCitizenSearch, setAutoScheduleCitizenSearch] = useState("");
+  const [autoScheduleCitizenSelected, setAutoScheduleCitizenSelected] = useState<Set<number>>(new Set());
 
   const [complaints, setComplaints] = useState<BackendComplaint[]>([]);
   const [complaintsLoading, setComplaintsLoading] = useState(false);
@@ -934,6 +939,81 @@ export default function WasteCompanyDashboard() {
     }
   };
 
+  const handleAutoScheduleFromCitizens = async () => {
+    if (!application || !companyDistrict) return;
+    const selected = citizens.filter(c => autoScheduleCitizenSelected.has(c.id));
+    if (selected.length === 0) { setAutoScheduleError("Select at least one citizen."); return; }
+    if (!autoScheduleCitizenDate) { setAutoScheduleError("Pick a date for the schedule."); return; }
+    setAutoScheduleSaving(true);
+    setAutoScheduleError("");
+
+    // Group citizens by sector → one schedule per sector
+    const bySector = new Map<string, { sectorName: string; cells: string[] }>();
+    selected.forEach(c => {
+      const key = c.sector || "Unknown";
+      if (!bySector.has(key)) bySector.set(key, { sectorName: c.sector || key, cells: [] });
+      if (c.cell && !bySector.get(key)!.cells.includes(c.cell)) bySector.get(key)!.cells.push(c.cell);
+    });
+
+    const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const d = new Date(autoScheduleCitizenDate);
+    const rawDay = DAY_NAMES[d.getDay()];
+    const safeDay: Day = (WEEK_DAYS as readonly string[]).includes(rawDay) ? rawDay as Day : "Monday";
+
+    let created = 0;
+    for (const [, info] of bySector) {
+      try {
+        const sectorMatch = districtSectors.find(s => s.name.toLowerCase() === info.sectorName.toLowerCase());
+        const citizenCount = selected.filter(c => (c.sector || "Unknown") === info.sectorName).length;
+        const payload = {
+          district_id: companyDistrict.id,
+          district_name: companyDistrict.name,
+          schedule_date: autoScheduleCitizenDate,
+          day: safeDay,
+          sector_id: sectorMatch?.id ?? "",
+          sector_name: sectorMatch?.name ?? info.sectorName,
+          cells: info.cells,
+          driver: autoScheduleDriver,
+          vehicle: autoScheduleVehicle,
+          start_time: autoScheduleCitizenTime,
+          waste_type: "General Waste" as WasteType,
+          status: "Scheduled" as TaskStatus,
+          notes: `Covers ${citizenCount} citizen${citizenCount !== 1 ? "s" : ""} in ${info.sectorName}`,
+        };
+        const res = await api.companySchedules.create(application.id, payload);
+        const saved: ScheduleTask = {
+          id: res.schedule.id,
+          districtId: res.schedule.district_id || companyDistrict.id,
+          districtName: res.schedule.district_name || companyDistrict.name,
+          scheduleDate: res.schedule.schedule_date || autoScheduleCitizenDate,
+          day: (res.schedule.day as Day) || safeDay,
+          sectorId: res.schedule.sector_id || payload.sector_id,
+          sectorName: res.schedule.sector_name || info.sectorName,
+          cells: res.schedule.cells || info.cells,
+          driver: res.schedule.driver || autoScheduleDriver,
+          vehicle: res.schedule.vehicle || autoScheduleVehicle,
+          startTime: res.schedule.start_time || autoScheduleCitizenTime,
+          wasteType: (res.schedule.waste_type as WasteType) || "General Waste",
+          status: (res.schedule.status as TaskStatus) || "Scheduled",
+          published: res.schedule.published ?? false,
+          notes: res.schedule.notes || payload.notes,
+        };
+        setScheduleTasks(prev => [saved, ...prev]);
+        created++;
+      } catch { /* skip failed sector */ }
+    }
+    setAutoScheduleSaving(false);
+    if (created > 0) {
+      setAutoScheduleModal(false);
+      setAutoScheduleCitizenSelected(new Set());
+      setAutoScheduleDriver("");
+      setAutoScheduleVehicle("");
+      setScheduleMessage(`${created} sector schedule${created > 1 ? "s" : ""} created for ${selected.length} citizens.`);
+    } else {
+      setAutoScheduleError("Failed to create schedules. Check your district is set correctly.");
+    }
+  };
+
   const scheduleByDay = WEEK_DAYS.map((day) => ({
     day,
     tasks: scheduleTasks.filter((task) => task.day === day),
@@ -1332,11 +1412,7 @@ export default function WasteCompanyDashboard() {
                         title="Auto-generate schedule entries from pending citizen pickup requests"
                       >
                         <Zap size={15} /> Auto from requests
-                        {pickupRequests.filter(r => r.status === "Pending" && r.preferred_date).length > 0 && (
-                          <span className="ml-1 bg-white text-amber-700 text-xs font-bold rounded-full px-1.5 py-0.5 leading-none">
-                            {pickupRequests.filter(r => r.status === "Pending" && r.preferred_date).length}
-                          </span>
-                        )}
+                        {(() => { const cIds = new Set(citizens.map(c => c.user_id)); const n = pickupRequests.filter(r => r.status === "Pending" && r.preferred_date && cIds.has(r.user_id)).length; return n > 0 ? <span className="ml-1 bg-white text-amber-700 text-xs font-bold rounded-full px-1.5 py-0.5 leading-none">{n}</span> : null; })()}
                       </button>
                       <button onClick={() => setScheduleView("week")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${scheduleView === "week" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                         Week view
@@ -2759,22 +2835,33 @@ export default function WasteCompanyDashboard() {
       {autoScheduleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <div className="flex items-center gap-2">
                 <Zap size={18} className="text-amber-600" />
-                <h3 className="font-bold text-gray-900">Auto-generate Schedule from Pickup Requests</h3>
+                <h3 className="font-bold text-gray-900">Auto-generate Schedule</h3>
               </div>
               <button onClick={() => setAutoScheduleModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
             </div>
 
+            {/* Tabs */}
+            <div className="flex gap-1 px-6 pt-4">
+              {(["requests", "citizens"] as const).map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => { setAutoScheduleTab(tab); setAutoScheduleError(""); }}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${autoScheduleTab === tab ? "bg-amber-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                >
+                  {tab === "requests" ? (() => { const cIds = new Set(citizens.map(c => c.user_id)); const n = pickupRequests.filter(r => r.status === "Pending" && r.preferred_date && cIds.has(r.user_id)).length; return `From Pickup Requests${n > 0 ? ` (${n})` : ""}`; })() : `From My Citizens${citizens.length > 0 ? ` (${citizens.length})` : ""}`}
+                </button>
+              ))}
+            </div>
+
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-              <p className="text-sm text-gray-500">
-                Select pending pickup requests below. The system will create a schedule entry for each one using the citizen&apos;s preferred date and time.
-              </p>
 
-              {/* Driver + Vehicle selectors */}
+              {/* Shared: Driver + Vehicle */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Assign Driver (optional)</label>
@@ -2792,25 +2879,21 @@ export default function WasteCompanyDashboard() {
                 </div>
               </div>
 
-              {/* Pending requests list */}
-              {(() => {
-                const eligible = pickupRequests.filter(r => r.status === "Pending" && r.preferred_date);
+              {/* ── Tab: From Pickup Requests ── */}
+              {autoScheduleTab === "requests" && (() => {
+                const citizenUserIds = new Set(citizens.map(c => c.user_id));
+                const eligible = pickupRequests.filter(r => r.status === "Pending" && r.preferred_date && citizenUserIds.has(r.user_id));
                 if (eligible.length === 0) return (
                   <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-400">
                     <PackagePlus size={32} className="mx-auto mb-2 opacity-30" />
-                    No pending pickup requests with a preferred date yet.
+                    No pending pickup requests from your citizens yet.
                   </div>
                 );
                 return (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{eligible.length} eligible request{eligible.length !== 1 ? "s" : ""}</p>
-                      <button
-                        onClick={() => setAutoScheduleSelected(
-                          autoScheduleSelected.size === eligible.length ? new Set() : new Set(eligible.map(r => r.id))
-                        )}
-                        className="text-xs text-amber-700 font-medium hover:underline"
-                      >
+                      <button onClick={() => setAutoScheduleSelected(autoScheduleSelected.size === eligible.length ? new Set() : new Set(eligible.map(r => r.id)))} className="text-xs text-amber-700 font-medium hover:underline">
                         {autoScheduleSelected.size === eligible.length ? "Deselect all" : "Select all"}
                       </button>
                     </div>
@@ -2818,19 +2901,10 @@ export default function WasteCompanyDashboard() {
                       const checked = autoScheduleSelected.has(r.id);
                       return (
                         <label key={r.id} className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition ${checked ? "border-amber-300 bg-amber-50" : "border-gray-100 bg-gray-50 hover:bg-gray-100"}`}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              const next = new Set(autoScheduleSelected);
-                              checked ? next.delete(r.id) : next.add(r.id);
-                              setAutoScheduleSelected(next);
-                            }}
-                            className="mt-0.5 accent-amber-600"
-                          />
+                          <input type="checkbox" checked={checked} onChange={() => { const n = new Set(autoScheduleSelected); checked ? n.delete(r.id) : n.add(r.id); setAutoScheduleSelected(n); }} className="mt-0.5 accent-amber-600" />
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <span className="font-medium text-gray-900 text-sm">{r.full_name ?? "Unknown citizen"}</span>
+                              <span className="font-medium text-gray-900 text-sm">{r.full_name ?? "Unknown"}</span>
                               <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${r.priority === "Urgent" ? "bg-red-100 text-red-700" : r.priority === "High" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700"}`}>{r.priority}</span>
                             </div>
                             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
@@ -2838,11 +2912,78 @@ export default function WasteCompanyDashboard() {
                               {r.preferred_time && <span className="flex items-center gap-1"><Clock size={11} className="text-amber-500" />{r.preferred_time}</span>}
                               {r.sector && <span>{r.sector}</span>}
                             </div>
-                            {r.notes && <p className="text-xs text-gray-400 mt-1 italic">"{r.notes}"</p>}
+                            {r.notes && <p className="text-xs text-gray-400 mt-1 italic">&ldquo;{r.notes}&rdquo;</p>}
                           </div>
                         </label>
                       );
                     })}
+                  </div>
+                );
+              })()}
+
+              {/* ── Tab: From Citizens ── */}
+              {autoScheduleTab === "citizens" && (() => {
+                const filteredCitizens = citizens.filter(c =>
+                  !autoScheduleCitizenSearch ||
+                  c.full_name?.toLowerCase().includes(autoScheduleCitizenSearch.toLowerCase()) ||
+                  c.sector?.toLowerCase().includes(autoScheduleCitizenSearch.toLowerCase()) ||
+                  c.cell?.toLowerCase().includes(autoScheduleCitizenSearch.toLowerCase())
+                );
+                return (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-500">Select citizens from your district. One schedule entry will be created per sector on the date you choose.</p>
+
+                    {/* Date + Time */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Schedule Date</label>
+                        <input type="date" value={autoScheduleCitizenDate} onChange={e => setAutoScheduleCitizenDate(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
+                        <input type="time" value={autoScheduleCitizenTime} onChange={e => setAutoScheduleCitizenTime(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                      </div>
+                    </div>
+
+                    {citizensLoading ? (
+                      <div className="flex justify-center py-6"><div className="animate-spin rounded-full h-6 w-6 border-t-2 border-amber-500" /></div>
+                    ) : citizens.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-400">
+                        <Users size={32} className="mx-auto mb-2 opacity-30" />
+                        No citizens found in your district yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {/* Search + Select all */}
+                        <div className="flex gap-3 items-center">
+                          <input
+                            type="text"
+                            placeholder="Search by name, sector or cell…"
+                            value={autoScheduleCitizenSearch}
+                            onChange={e => setAutoScheduleCitizenSearch(e.target.value)}
+                            className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                          />
+                          <button onClick={() => setAutoScheduleCitizenSelected(autoScheduleCitizenSelected.size === filteredCitizens.length ? new Set() : new Set(filteredCitizens.map(c => c.id)))} className="text-xs text-amber-700 font-medium hover:underline whitespace-nowrap">
+                            {autoScheduleCitizenSelected.size === filteredCitizens.length ? "Deselect all" : "Select all"}
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500">{autoScheduleCitizenSelected.size} of {citizens.length} selected</p>
+                        <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                          {filteredCitizens.map(c => {
+                            const checked = autoScheduleCitizenSelected.has(c.id);
+                            return (
+                              <label key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${checked ? "border-amber-300 bg-amber-50" : "border-gray-100 bg-gray-50 hover:bg-gray-100"}`}>
+                                <input type="checkbox" checked={checked} onChange={() => { const n = new Set(autoScheduleCitizenSelected); checked ? n.delete(c.id) : n.add(c.id); setAutoScheduleCitizenSelected(n); }} className="accent-amber-600 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-gray-900 truncate">{c.full_name}</p>
+                                  <p className="text-xs text-gray-500">{[c.sector, c.cell, c.village].filter(Boolean).join(" · ") || "—"}</p>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -2854,15 +2995,21 @@ export default function WasteCompanyDashboard() {
 
             {/* Footer */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 gap-3">
-              <span className="text-sm text-gray-500">{autoScheduleSelected.size} request{autoScheduleSelected.size !== 1 ? "s" : ""} selected</span>
+              <span className="text-sm text-gray-500">
+                {autoScheduleTab === "requests"
+                  ? `${autoScheduleSelected.size} request${autoScheduleSelected.size !== 1 ? "s" : ""} selected`
+                  : `${autoScheduleCitizenSelected.size} citizen${autoScheduleCitizenSelected.size !== 1 ? "s" : ""} selected`}
+              </span>
               <div className="flex gap-3">
                 <button onClick={() => setAutoScheduleModal(false)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
                 <button
-                  onClick={() => void handleAutoSchedule()}
-                  disabled={autoScheduleSaving || autoScheduleSelected.size === 0}
+                  onClick={() => void (autoScheduleTab === "requests" ? handleAutoSchedule() : handleAutoScheduleFromCitizens())}
+                  disabled={autoScheduleSaving || (autoScheduleTab === "requests" ? autoScheduleSelected.size === 0 : autoScheduleCitizenSelected.size === 0)}
                   className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {autoScheduleSaving ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Creating…</> : <><Zap size={15} /> Generate {autoScheduleSelected.size > 0 ? autoScheduleSelected.size : ""} Schedule{autoScheduleSelected.size !== 1 ? "s" : ""}</>}
+                  {autoScheduleSaving
+                    ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Creating…</>
+                    : <><Zap size={15} /> Generate Schedules</>}
                 </button>
               </div>
             </div>
