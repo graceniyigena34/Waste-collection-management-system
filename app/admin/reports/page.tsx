@@ -85,7 +85,7 @@ export default function ReportsPage() {
       api.payments.all().catch(() => [] as BackendPayment[]),
       api.complaints.all().catch(() => [] as BackendComplaint[]),
       api.households.all().catch(() => [] as BackendHousehold[]),
-      api.drivers.all().catch(() => ({ drivers: [] as BackendDriverWithCompany[] })),
+      api.drivers.listAll().catch(() => ({ drivers: [] as BackendDriverWithCompany[] })),
     ]).then(([p, c, h, d]) => {
       setPayments(p);
       setComplaints(c);
