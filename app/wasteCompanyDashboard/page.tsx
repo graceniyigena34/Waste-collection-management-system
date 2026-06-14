@@ -7,7 +7,7 @@ import {
   Car, LogOut, Phone, Mail, User, Truck,
   LayoutDashboard, ClipboardList, Route, Settings, ArrowUpRight,
   Clock, AlertTriangle, Bell, Plus,
-  CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send, PackagePlus,
+  CalendarDays, CheckCircle2, Check, Edit3, Trash2, X, MessageSquare, Eye, MessageCircle, Send, PackagePlus, Zap,
 } from "lucide-react";
 import { isWasteCollectorRole } from "@/lib/company-application";
 import { api, type BackendCompanyProfile, type BackendDriver, type BackendVehicle, type BackendComplaint, type BackendPickupRequest, type BackendAssignment, type BackendChatMessage, type BackendConversationSummary, type BackendHousehold, getStoredUserInfo } from "@/lib/api-client";
@@ -88,6 +88,13 @@ export default function WasteCompanyDashboard() {
   });
   const [scheduleView, setScheduleView] = useState<"week" | "list">("week");
   const [activeSection, setActiveSection] = useState<string>("top-section");
+
+  const [autoScheduleModal, setAutoScheduleModal] = useState(false);
+  const [autoScheduleSelected, setAutoScheduleSelected] = useState<Set<number>>(new Set());
+  const [autoScheduleDriver, setAutoScheduleDriver] = useState("");
+  const [autoScheduleVehicle, setAutoScheduleVehicle] = useState("");
+  const [autoScheduleSaving, setAutoScheduleSaving] = useState(false);
+  const [autoScheduleError, setAutoScheduleError] = useState("");
 
   const [complaints, setComplaints] = useState<BackendComplaint[]>([]);
   const [complaintsLoading, setComplaintsLoading] = useState(false);
@@ -864,6 +871,69 @@ export default function WasteCompanyDashboard() {
     resetScheduleForm();
   };
 
+  const handleAutoSchedule = async () => {
+    if (!application || !companyDistrict) return;
+    const pending = pickupRequests.filter(r => autoScheduleSelected.has(r.id) && r.preferred_date);
+    if (pending.length === 0) { setAutoScheduleError("Select at least one request that has a preferred date."); return; }
+    setAutoScheduleSaving(true);
+    setAutoScheduleError("");
+    const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    let created = 0;
+    for (const r of pending) {
+      try {
+        const d = new Date(r.preferred_date!);
+        const rawDay = DAY_NAMES[d.getDay()];
+        const safeDay: Day = (WEEK_DAYS as readonly string[]).includes(rawDay) ? rawDay as Day : "Monday";
+        const sectorMatch = districtSectors.find(s => s.name.toLowerCase() === (r.sector ?? "").toLowerCase());
+        const payload = {
+          district_id: companyDistrict.id,
+          district_name: companyDistrict.name,
+          schedule_date: r.preferred_date!,
+          day: safeDay,
+          sector_id: sectorMatch?.id ?? "",
+          sector_name: sectorMatch?.name ?? r.sector ?? "",
+          cells: [] as string[],
+          driver: autoScheduleDriver,
+          vehicle: autoScheduleVehicle,
+          start_time: r.preferred_time ?? "08:00",
+          waste_type: "General Waste" as WasteType,
+          status: "Scheduled" as TaskStatus,
+          notes: `Auto from pickup request #${r.id}${r.notes ? `: ${r.notes}` : ""}`,
+        };
+        const res = await api.companySchedules.create(application.id, payload);
+        const saved: ScheduleTask = {
+          id: res.schedule.id,
+          districtId: res.schedule.district_id || companyDistrict.id,
+          districtName: res.schedule.district_name || companyDistrict.name,
+          scheduleDate: res.schedule.schedule_date || r.preferred_date!,
+          day: (res.schedule.day as Day) || safeDay,
+          sectorId: res.schedule.sector_id || payload.sector_id,
+          sectorName: res.schedule.sector_name || payload.sector_name,
+          cells: res.schedule.cells || [],
+          driver: res.schedule.driver || autoScheduleDriver,
+          vehicle: res.schedule.vehicle || autoScheduleVehicle,
+          startTime: res.schedule.start_time || payload.start_time,
+          wasteType: (res.schedule.waste_type as WasteType) || "General Waste",
+          status: (res.schedule.status as TaskStatus) || "Scheduled",
+          published: res.schedule.published ?? false,
+          notes: res.schedule.notes || payload.notes,
+        };
+        setScheduleTasks(prev => [saved, ...prev]);
+        created++;
+      } catch { /* skip individually failed requests */ }
+    }
+    setAutoScheduleSaving(false);
+    if (created > 0) {
+      setAutoScheduleModal(false);
+      setAutoScheduleSelected(new Set());
+      setAutoScheduleDriver("");
+      setAutoScheduleVehicle("");
+      setScheduleMessage(`${created} schedule${created > 1 ? "s" : ""} auto-generated from pickup requests.`);
+    } else {
+      setAutoScheduleError("Failed to create schedules. Check your district is set correctly.");
+    }
+  };
+
   const scheduleByDay = WEEK_DAYS.map((day) => ({
     day,
     tasks: scheduleTasks.filter((task) => task.day === day),
@@ -1255,6 +1325,18 @@ export default function WasteCompanyDashboard() {
                     <div className="flex flex-wrap items-center gap-2">
                       <button onClick={() => openScheduleModal()} className="inline-flex items-center gap-2 rounded-xl bg-green-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-green-800 transition">
                         <Plus size={15} /> Add weekly task
+                      </button>
+                      <button
+                        onClick={() => { setAutoScheduleModal(true); setAutoScheduleError(""); setAutoScheduleSelected(new Set()); }}
+                        className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-700 transition"
+                        title="Auto-generate schedule entries from pending citizen pickup requests"
+                      >
+                        <Zap size={15} /> Auto from requests
+                        {pickupRequests.filter(r => r.status === "Pending" && r.preferred_date).length > 0 && (
+                          <span className="ml-1 bg-white text-amber-700 text-xs font-bold rounded-full px-1.5 py-0.5 leading-none">
+                            {pickupRequests.filter(r => r.status === "Pending" && r.preferred_date).length}
+                          </span>
+                        )}
                       </button>
                       <button onClick={() => setScheduleView("week")} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${scheduleView === "week" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                         Week view
@@ -2668,6 +2750,121 @@ export default function WasteCompanyDashboard() {
                 {addVehicleSaving && <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />}
                 {addVehicleSaving ? "Saving..." : "Add Vehicle"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Auto-Schedule Modal ── */}
+      {autoScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Zap size={18} className="text-amber-600" />
+                <h3 className="font-bold text-gray-900">Auto-generate Schedule from Pickup Requests</h3>
+              </div>
+              <button onClick={() => setAutoScheduleModal(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+              <p className="text-sm text-gray-500">
+                Select pending pickup requests below. The system will create a schedule entry for each one using the citizen&apos;s preferred date and time.
+              </p>
+
+              {/* Driver + Vehicle selectors */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Assign Driver (optional)</label>
+                  <select value={autoScheduleDriver} onChange={e => setAutoScheduleDriver(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <option value="">No driver assigned</option>
+                    {companyDrivers.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Assign Vehicle (optional)</label>
+                  <select value={autoScheduleVehicle} onChange={e => setAutoScheduleVehicle(e.target.value)} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <option value="">No vehicle assigned</option>
+                    {companyVehicles.map(v => <option key={v.id} value={v.plate_number}>{v.plate_number} — {v.model}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Pending requests list */}
+              {(() => {
+                const eligible = pickupRequests.filter(r => r.status === "Pending" && r.preferred_date);
+                if (eligible.length === 0) return (
+                  <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-400">
+                    <PackagePlus size={32} className="mx-auto mb-2 opacity-30" />
+                    No pending pickup requests with a preferred date yet.
+                  </div>
+                );
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">{eligible.length} eligible request{eligible.length !== 1 ? "s" : ""}</p>
+                      <button
+                        onClick={() => setAutoScheduleSelected(
+                          autoScheduleSelected.size === eligible.length ? new Set() : new Set(eligible.map(r => r.id))
+                        )}
+                        className="text-xs text-amber-700 font-medium hover:underline"
+                      >
+                        {autoScheduleSelected.size === eligible.length ? "Deselect all" : "Select all"}
+                      </button>
+                    </div>
+                    {eligible.map(r => {
+                      const checked = autoScheduleSelected.has(r.id);
+                      return (
+                        <label key={r.id} className={`flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition ${checked ? "border-amber-300 bg-amber-50" : "border-gray-100 bg-gray-50 hover:bg-gray-100"}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              const next = new Set(autoScheduleSelected);
+                              checked ? next.delete(r.id) : next.add(r.id);
+                              setAutoScheduleSelected(next);
+                            }}
+                            className="mt-0.5 accent-amber-600"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <span className="font-medium text-gray-900 text-sm">{r.full_name ?? "Unknown citizen"}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${r.priority === "Urgent" ? "bg-red-100 text-red-700" : r.priority === "High" ? "bg-orange-100 text-orange-700" : "bg-yellow-100 text-yellow-700"}`}>{r.priority}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
+                              <span className="flex items-center gap-1"><CalendarDays size={11} className="text-amber-500" />{new Date(r.preferred_date!).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</span>
+                              {r.preferred_time && <span className="flex items-center gap-1"><Clock size={11} className="text-amber-500" />{r.preferred_time}</span>}
+                              {r.sector && <span>{r.sector}</span>}
+                            </div>
+                            {r.notes && <p className="text-xs text-gray-400 mt-1 italic">"{r.notes}"</p>}
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {autoScheduleError && (
+                <div className="rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">{autoScheduleError}</div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 gap-3">
+              <span className="text-sm text-gray-500">{autoScheduleSelected.size} request{autoScheduleSelected.size !== 1 ? "s" : ""} selected</span>
+              <div className="flex gap-3">
+                <button onClick={() => setAutoScheduleModal(false)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Cancel</button>
+                <button
+                  onClick={() => void handleAutoSchedule()}
+                  disabled={autoScheduleSaving || autoScheduleSelected.size === 0}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {autoScheduleSaving ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Creating…</> : <><Zap size={15} /> Generate {autoScheduleSelected.size > 0 ? autoScheduleSelected.size : ""} Schedule{autoScheduleSelected.size !== 1 ? "s" : ""}</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>
