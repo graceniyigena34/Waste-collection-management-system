@@ -2447,10 +2447,22 @@ export default function WasteCompanyDashboard() {
 
                   <div className="space-y-3">
                     <label className="block text-sm font-medium text-gray-700">Driver</label>
-                    <select value={scheduleForm.driver} onChange={(e) => setScheduleForm((current) => ({ ...current, driver: e.target.value }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <select
+                      value={scheduleForm.driver}
+                      onChange={(e) => setScheduleForm((current) => ({ ...current, driver: e.target.value }))}
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
                       <option value="">Select driver</option>
                       {companyDrivers.map((driver) => <option key={driver.id} value={driver.name}>{driver.name}</option>)}
                     </select>
+                    {scheduleForm.driver && (() => {
+                      const d = companyDrivers.find(x => x.name === scheduleForm.driver);
+                      return d?.phone ? (
+                        <p className="text-xs text-gray-500 flex items-center gap-1 pl-1">
+                          <Phone size={12} className="text-gray-400" /> {d.phone}
+                        </p>
+                      ) : null;
+                    })()}
                   </div>
 
                   <div className="space-y-3">
@@ -2461,19 +2473,9 @@ export default function WasteCompanyDashboard() {
                     </select>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-3 md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700">Start time</label>
                     <input value={scheduleForm.startTime} onChange={(e) => setScheduleForm((current) => ({ ...current, startTime: e.target.value }))} type="time" className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
-                  </div>
-
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700">Waste type</label>
-                    <select value={scheduleForm.wasteType} onChange={(e) => setScheduleForm((current) => ({ ...current, wasteType: e.target.value as WasteType }))} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                      <option>General Waste</option>
-                      <option>Recyclables</option>
-                      <option>Organic Waste</option>
-                      <option>Hazardous</option>
-                    </select>
                   </div>
 
                   <div className="space-y-3 md:col-span-2">
