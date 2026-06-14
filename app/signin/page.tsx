@@ -75,9 +75,13 @@ export default function Signin() {
         return;
       }
 
-      const submitted = localStorage.getItem("household_details_submitted");
-      if (submitted === "true") router.push("/User-Dashboard");
-      else router.push("/household-details");
+      try {
+        await api.households.me();
+        localStorage.setItem("household_details_submitted", "true");
+        router.push("/User-Dashboard");
+      } catch {
+        router.push("/household-details");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to sign in.";
       setError(message);
